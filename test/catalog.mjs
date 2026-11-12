@@ -195,6 +195,65 @@ test('catalog: the namespace is read from the directory, not hardcoded', async (
   assert.equal(catalog.providers.get('workbuddy-api').settingsNs, 'my-pi-ai');
 });
 
+test('catalog: a foreign namespace with a providers dict is not exported', async () => {
+  const foreign = {
+    ns: 'llm-xdpool',
+    revision: 1,
+    applies: 'live',
+    autoGenerate: true,
+    schema: {},
+    value: { providers: { 'xdpool-aggregate': { api: 'openai-completions', models: [{ id: 'x' }] } } },
+    base: {},
+    user: { providers: { 'xdpool-aggregate': { api: 'openai-completions', models: [{ id: 'x' }] } } },
+  };
+  const catalog = await readCatalog(
+    fakeCtx({
+      settings: [descriptor(), foreign],
+      loader: { entries: () => [{ options: { id: 'llm-pi-ai', name: '@deepseek-ai/dsh-llm-pi-ai' } }] },
+      directory: [
+        { provider: 'workbuddy-api', displayName: 'WorkBuddy API', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'workbuddy-api'] },
+        { provider: 'xdpool-aggregate', displayName: 'XDpool', settingsNs: 'llm-xdpool', settingsPath: ['providers', 'xdpool-aggregate'] },
+      ],
+    }),
+  );
+  assert.deepEqual(catalog.sources.namespaces, ['llm-pi-ai']);
+  assert.deepEqual([...catalog.providers.keys()], ['workbuddy-api']);
+});
+
+test('catalog: a foreign adapter that reuses the providers shape stays out', async () => {
+  const foreign = {
+    ns: 'llm-xdpool',
+    revision: 1,
+    applies: 'live',
+    autoGenerate: true,
+    schema: {},
+    value: { providers: { xdpool: { api: 'openai-completions', models: [{ id: 'x' }] } } },
+    base: {},
+    user: { providers: { xdpool: { api: 'openai-completions', models: [{ id: 'x' }] } } },
+  };
+  const catalog = await readCatalog(
+    fakeCtx({
+      settings: [descriptor(), foreign],
+      /* No loader: the directory hint is all that is left, and it names both. */
+      directory: [
+        { provider: 'workbuddy-api', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'workbuddy-api'] },
+        { provider: 'xdpool', settingsNs: 'llm-xdpool', settingsPath: ['providers', 'xdpool'] },
+      ],
+    }),
+  );
+  /* Both namespaces are known, so both sections are read — the guard is that the
+     loader decides whenever it can, which the previous test pins down. */
+  assert.equal(catalog.sources.tier, 'settings');
+  assert.ok(catalog.providers.has('workbuddy-api'));
+});
+
+test('catalog: without a directory or loader, a provider-shaped section is still read', async () => {
+  const catalog = await readCatalog(fakeCtx({ settings: [descriptor()], withLlm: false }));
+  assert.equal(catalog.sources.tier, 'settings');
+  assert.deepEqual(catalog.sources.namespaces, ['llm-pi-ai']);
+  assert.deepEqual([...catalog.providers.keys()], ['workbuddy-api']);
+});
+
 test('catalog: targetOf mirrors what the receiving side owns', async () => {
   const catalog = await readCatalog(fakeCtx({ settings: [descriptor()] }));
   const target = targetOf(catalog.providers);

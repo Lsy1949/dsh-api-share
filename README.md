@@ -126,7 +126,7 @@ Errors: `400 bad-body`, `403 cross-origin`, `403 secrets-require-browser-origin`
 
 ```powershell
 npm run check   # node --check on every shipped file
-npm test        # 53 assertions across 5 suites
+npm test        # 56 assertions across 5 suites
 ```
 
 | Suite | Covers |

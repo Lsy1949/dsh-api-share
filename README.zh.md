@@ -121,7 +121,7 @@ dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
 
 ```powershell
 npm run check   # 对每个发布文件跑 node --check
-npm test        # 5 个套件，53 条断言
+npm test        # 5 个套件，56 条断言
 ```
 
 | 套件 | 覆盖 |
