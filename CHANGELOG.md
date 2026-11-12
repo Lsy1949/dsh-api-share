@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-12
+
+**First published release.** It folds the layout and interaction work that was developed locally as 0.2.1 and
+0.2.2: scrollable columns, a definite dialog height, a full-width action bar, collapsed groups by default,
+format-aware copy/download, and an explainable "unconfigured catalog providers" line.
+
 ### Fixed
 
 - An expanded API group's model list still would not scroll: the scroll column is a flex column, its children shrink by default, and a child with `overflow: hidden` may shrink to zero — so the groups compressed and the column never overflowed. Children now keep their content height (`flex: 0 0 auto`), the preview is the one child allowed to grow, and the scroll area is bounded by its own column (`max-height: 100%`) instead of a viewport guess.
@@ -77,5 +83,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Test suite: YAML/naming unit tests, export composition, the collection layer with fake services, a browser-bundle
   smoke test in a fake module loader, and publication/compatibility guards.
 
-[Unreleased]: https://github.com/Lsy1949/dsh-api-share/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Lsy1949/dsh-api-share/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/Lsy1949/dsh-api-share/releases/tag/v0.2.3
+[0.2.0]: https://github.com/Lsy1949/dsh-api-share/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Lsy1949/dsh-api-share/releases/tag/v0.1.0

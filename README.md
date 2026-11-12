@@ -2,6 +2,10 @@
 
 [中文](README.zh.md) | English
 
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node: >=24](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](package.json)
+[![dsh: 0.2.x](https://img.shields.io/badge/dsh-0.2.x-brightgreen.svg)](package.json)
+
 Share the model provider configuration of a [DeepSeek Harness](https://github.com/deepseek-ai) profile — and take it back.
 
 Adds an **Import / export configuration** entry at the bottom of **Settings → Models**, opening a dialog with two tabs:
@@ -15,6 +19,36 @@ Adds an **Import / export configuration** entry at the bottom of **Settings → 
 - **Host half**: four same-origin `POST` routes: read, compose, plan, write. There is exactly one write path —
   `configEditor.edit()`.
 - **Client half**: one footer slot entry, one dialog. No third-party dependency, no bundler, no JSX.
+
+## The dialog
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Share model configuration          [ Export | Import ] Close │
+├───────────────────────────────┬──────────────────────────────┤
+│ Search…      Expand all  Fold │ Export options       [YAML|JSON]│
+│ APIs / models      All   None │ Name collisions ▾            │
+│ ▶ Relay    openai-completions │ Preview                     │
+│   ▪ 19/19                     │ ┌─────────────────────────┐ │
+│ ▶ Second API  anthropic-…      │ │ - id: llm-pi-ai         │ │
+│   47 catalog providers…        │ │   …                     │ │
+├───────────────────────────────┴──────────────────────────────┤
+│ 2 APIs · 21 models selected     [Copy YAML] [Download YAML]  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **Every group starts collapsed**; the header (chevron, name, protocol/credential/catalog badges, `selected/total`)
+  toggles it.
+- Inside a group there is a fixed **All / None** pair that disables itself when it would do nothing, plus that
+  group's selected count.
+- Above the list: **search** (provider id, display name, endpoint, model id and name), **expand all / collapse all**,
+  and all/none over the current filter.
+- The two columns **scroll independently**, with sticky column heads and a footer that always shows the current
+  selection and the next action.
+- **Copy and download follow the active tab**: YAML offers *Copy YAML* / *Download YAML* (`.yml`), JSON offers
+  *Copy JSON* / *Download JSON* (`.json`).
+- Escape closes the dialog, the backdrop closes it, controls are keyboard reachable, and every failure renders as a
+  line of text rather than an empty box.
 
 ## Compatibility
 
@@ -143,6 +177,8 @@ Off by default. When you tick **Include plaintext API keys**:
 ```powershell
 # from the desktop: Settings → Plugins, or
 dsh plugin --profile desktop add dsh-api-share
+# straight from GitHub
+dsh plugin --profile desktop add github:Lsy1949/dsh-api-share
 # local development against a checkout
 dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
 ```
@@ -181,7 +217,7 @@ Errors: `400 bad-body` / `400 not-confirmed`, `403 cross-origin`, `403 secrets-r
 
 ```powershell
 npm run check   # node --check on every shipped file
-npm test        # 102 assertions across 7 suites
+npm test        # 103 assertions across 7 suites
 ```
 
 | Suite | Covers |
@@ -200,7 +236,10 @@ npm test        # 102 assertions across 7 suites
 2. `npm pack --dry-run` — confirm the tarball holds `index.js`, `client.js`, `cordis.patch.yml`, `lib/**`, and the
    docs, and nothing else.
 3. Bump `version` and add a `CHANGELOG.md` entry.
-4. `npm publish` and tag the commit; the repository URL lives in `package.json`.
+4. Push to GitHub and tag `v<version>`; publish to npm only if that is wanted.
+
+Repository: <https://github.com/Lsy1949/dsh-api-share> — install with
+`dsh plugin --profile desktop add github:Lsy1949/dsh-api-share`.
 
 ## License
 

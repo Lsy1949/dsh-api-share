@@ -2,6 +2,10 @@
 
 中文 | [English](README.md)
 
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node: >=24](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](package.json)
+[![dsh: 0.2.x](https://img.shields.io/badge/dsh-0.2.x-brightgreen.svg)](package.json)
+
 把 [DeepSeek Harness](https://github.com/deepseek-ai) 某个 profile 的模型 provider 配置分享出去 —— 也能收回来。
 
 在 **设置 → 模型** 页面底部加一个「导入 / 导出配置」入口，打开后是两个标签页：
@@ -13,6 +17,30 @@
 
 - **宿主半边**：四条同源 `POST` 路由，读配置、合成产物、写配置。写只有一个入口 —— `configEditor.edit()`。
 - **客户端半边**：一个 footer 插槽条目、一个对话框。零第三方依赖、无打包器、无 JSX。
+
+## 界面
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 模型配置分享                       [ 导出 | 导入 ]      关闭   │
+├───────────────────────────────┬──────────────────────────────┤
+│ 搜索…       展开全部  收起全部 │ 导出选项            [YAML|JSON]│
+│ API / 模型         全选  清空  │ 重名处理 ▾                    │
+│ ▶ Relay    openai-completions  │ 预览                          │
+│   ▪ 19/19                     │ ┌──────────────────────────┐ │
+│ ▶ Second API  anthropic-…      │ │ - id: llm-pi-ai          │ │
+│   还有 47 个内置 provider…     │ │   …                      │ │
+├───────────────────────────────┴──────────────────────────────┤
+│ 已选 2 个 API · 21 个模型        [复制 YAML] [下载 YAML]      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **分组默认收起**，点标题（或左侧 ▶）展开；标题上有协议、凭据、内置目录徽章与 `已选/总数`
+- 组内是**固定的「全选 / 清空」两个按钮**（无意义时自动置灰），右侧显示该组已选数量
+- 顶部有**搜索**（按 provider 名、id、端点、模型 id/名称过滤）、**展开全部 / 收起全部**、以及作用于当前筛选结果的 **全选 / 清空**
+- 左右两栏**各自独立滚动**，列头与底部操作栏固定；底部状态栏始终显示当前选择与下一步动作
+- 「复制 / 下载」**跟随当前标签页**：YAML → 复制 YAML / 下载 `.yml`；JSON → 复制 JSON / 下载 `.json`
+- 对话框支持 Esc 关闭、点击遮罩关闭、键盘可达；对话框内失败都会显示成一行说明，不会留空白
 
 ## 兼容性
 
@@ -136,6 +164,8 @@
 ```powershell
 # 桌面端：设置 → 插件；或
 dsh plugin --profile desktop add dsh-api-share
+# 直接从 GitHub 装
+dsh plugin --profile desktop add github:Lsy1949/dsh-api-share
 # 本地开发指向工作区里的包
 dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
 ```
@@ -173,7 +203,7 @@ dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
 
 ```powershell
 npm run check   # 对每个发布文件跑 node --check
-npm test        # 7 个套件，102 条断言
+npm test        # 7 个套件，103 条断言
 ```
 
 | 套件 | 覆盖 |
@@ -191,7 +221,10 @@ npm test        # 7 个套件，102 条断言
 1. `npm run verify` —— 静态检查 + 全量测试（含兼容性守卫）。
 2. `npm pack --dry-run` —— 确认 tarball 只含 `index.js`、`client.js`、`cordis.patch.yml`、`lib/**` 与文档。
 3. 升 `version` 并写 `CHANGELOG.md`。
-4. `npm publish`、给提交打 tag；仓库地址写在 `package.json` 里。
+4. `git push` 到 GitHub，打 `v<version>` tag；需要发 npm 时再 `npm publish`。
+
+仓库：<https://github.com/Lsy1949/dsh-api-share>
+装法：`dsh plugin --profile desktop add github:Lsy1949/dsh-api-share`
 
 ## 许可
 
