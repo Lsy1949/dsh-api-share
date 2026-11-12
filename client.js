@@ -78,11 +78,13 @@ window.__ModuleLoader__.load({
         previewEmpty: '勾选至少一个模型后显示预览。',
         previewBusy: '正在生成…',
         previewFailed: '生成失败：',
-        copy: '复制 YAML',
-        copied: '已复制到剪贴板',
+        copyYaml: '复制 YAML',
+        copyJson: '复制 JSON',
+        copied: '已复制 {format} 到剪贴板',
         copyFailed: '复制失败，请手动选择文本。',
-        download: '下载 JSON',
-        downloaded: '已开始下载',
+        downloadYaml: '下载 YAML',
+        downloadJson: '下载 JSON',
+        downloaded: '已开始下载 {format}',
         selected: '已选 {providers} 个 API · {models} 个模型',
         renames: '已自动改名',
         identical: '与现有配置一致',
@@ -90,6 +92,10 @@ window.__ModuleLoader__.load({
         skipped: '未导出',
         secretsIncluded: '已包含明文密钥',
         moreDormant: '另有 {count} 个内置 provider 未配置',
+        dormantTitle: '内置目录里还有 {count} 个 provider 没有配置',
+        dormantHint: '这些是 pi-ai 内置目录自带的 provider（openai、anthropic、groq…），本 profile 没有它们的配置，所以没有 API Key、没有选定模型，导出时不可选。要用它们请到「模型设置 → 添加模型 provider」。',
+        dormantShow: '展开列表',
+        dormantHide: '收起列表',
         /* import */
         importTitle: '导入配置',
         importHint: '粘贴之前导出的 YAML 片段或 JSON 文件内容，先预览会改什么，再写进本 profile。',
@@ -161,11 +167,13 @@ window.__ModuleLoader__.load({
         previewEmpty: 'Select at least one model to see the preview.',
         previewBusy: 'Generating…',
         previewFailed: 'Generation failed: ',
-        copy: 'Copy YAML',
-        copied: 'Copied to the clipboard',
+        copyYaml: 'Copy YAML',
+        copyJson: 'Copy JSON',
+        copied: '{format} copied to the clipboard',
         copyFailed: 'Copy failed — select the text manually.',
-        download: 'Download JSON',
-        downloaded: 'Download started',
+        downloadYaml: 'Download YAML',
+        downloadJson: 'Download JSON',
+        downloaded: '{format} download started',
         selected: '{providers} APIs · {models} models selected',
         renames: 'Renamed automatically',
         identical: 'Identical to the current configuration',
@@ -173,6 +181,10 @@ window.__ModuleLoader__.load({
         skipped: 'Not exported',
         secretsIncluded: 'Plaintext keys included',
         moreDormant: '{count} more catalog providers are not configured',
+        dormantTitle: '{count} catalog providers are still unconfigured',
+        dormantHint: 'These come with the installed pi-ai catalog (openai, anthropic, groq…). This profile has no configuration for them — no API key, no chosen models — so they cannot be exported. Add them in Models settings if you want them.',
+        dormantShow: 'Show list',
+        dormantHide: 'Hide list',
         importTitle: 'Import configuration',
         importHint: 'Paste a previously exported YAML snippet or JSON file, preview what would change, then write it into this profile.',
         pasteLabel: 'Snippet',
@@ -320,13 +332,14 @@ window.__ModuleLoader__.load({
           '.das-tab[aria-selected="true"]{background:var(--dsw-alias-bg-layer-1,#18181b);color:var(--dsw-alias-label-primary,inherit);box-shadow:0 0 0 1px var(--dsw-alias-border-l3,rgba(128,128,128,.3))}',
           '.das-tab:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,#4c8dff);outline-offset:2px}',
           /* body */
-          '.das-body{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(360px,1fr);min-height:0;flex:1}',
-          '.das-col{display:flex;flex-direction:column;min-height:0;min-width:0}',
+          '.das-body{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(360px,1fr);grid-template-rows:minmax(0,1fr);min-height:0;flex:1;overflow:hidden}',
+          '.das-col{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}',
           '.das-col+.das-col{border-left:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-col-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.16));background:var(--dsw-alias-bg-layer-2,#1c1c20);position:sticky;top:0;z-index:2}',
           '.das-col-title{font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));margin:0;flex:1}',
-          '.das-scroll{overflow:auto;padding:12px 16px;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px}',
+          '.das-scroll{overflow-y:auto;overflow-x:hidden;padding:12px 16px;min-height:0;flex:1 1 0;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}',
           /* provider accordion */
+          '.das-dormant{margin-top:4px;padding-top:8px;border-top:1px dashed var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-group{border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.26));border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.05));overflow:hidden}',
           '.das-group[data-selected="false"]{opacity:.72}',
           '.das-group-head{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;width:100%;text-align:left;background:none;border:0;color:inherit;font-family:inherit}',
@@ -667,25 +680,29 @@ window.__ModuleLoader__.load({
       var search = searchState[0];
       var setSearch = searchState[1];
 
+      var dormantState = React.useState(false);
+      var dormantOpen = dormantState[0];
+      var setDormantOpen = dormantState[1];
+
       var previewState = React.useState({ status: 'idle', yaml: '', json: '', renames: [], identical: [], warnings: [], error: '' });
       var preview = previewState[0];
       var setPreview = previewState[1];
 
-      /* Seed the selection once the catalogue arrives: everything ticked, the
-         first provider open so the dialog never looks empty. */
+      /* Seed the selection once the catalogue arrives: everything ticked, every
+         group collapsed so the list stays scannable until the user opens one. */
       var seeded = React.useRef(false);
       React.useEffect(function () {
         if (catalog.status !== 'ready' || seeded.current) return undefined;
         seeded.current = true;
         var next = {};
         var open = {};
-        (catalog.providers || []).forEach(function (provider, index) {
+        (catalog.providers || []).forEach(function (provider) {
           var models = {};
           (provider.models || []).forEach(function (model) {
             models[model.id] = true;
           });
           next[provider.id] = models;
-          open[provider.id] = index === 0;
+          open[provider.id] = false;
         });
         setSelected(next);
         setExpanded(open);
@@ -830,19 +847,27 @@ window.__ModuleLoader__.load({
         [view],
       );
 
+      /* Both artefacts are always generated; the visible tab decides which one
+         the buttons act on, so "复制" and "下载" never disagree with the preview. */
+      var activeText = tab === 'yaml' ? preview.yaml : preview.json;
+      var activeFormat = tab === 'yaml' ? 'yml' : 'json';
+      var activeMime = tab === 'yaml' ? 'application/yaml' : 'application/json';
+      var copyLabel = tab === 'yaml' ? copy.copyYaml : copy.copyJson;
+      var downloadLabel = tab === 'yaml' ? copy.downloadYaml : copy.downloadJson;
+
       var onCopy = React.useCallback(function () {
-        if (preview.yaml === '') return;
-        copyText(preview.yaml).then(function (ok) {
-          props.onStatus(ok ? copy.copied : copy.copyFailed);
+        if (preview.yaml === '' || preview.json === '') return;
+        copyText(activeText).then(function (ok) {
+          props.onStatus(ok ? format(copy.copied, { format: activeFormat.toUpperCase() }) : copy.copyFailed);
         });
-      }, [preview.yaml, copy, props.onStatus]);
+      }, [activeText, activeFormat, preview.yaml, preview.json, copy, props.onStatus]);
 
       var onDownload = React.useCallback(function () {
-        if (preview.json === '') return;
+        if (preview.yaml === '' || preview.json === '') return;
         var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        var ok = downloadText('dsh-model-config-' + stamp + '.json', preview.json, 'application/json');
-        props.onStatus(ok ? copy.downloaded : copy.previewFailed);
-      }, [preview.json, copy, props.onStatus]);
+        var ok = downloadText('dsh-model-config-' + stamp + '.' + activeFormat, activeText, activeMime);
+        props.onStatus(ok ? format(copy.downloaded, { format: activeFormat.toUpperCase() }) : copy.previewFailed);
+      }, [activeText, activeFormat, activeMime, preview.yaml, preview.json, copy, props.onStatus]);
 
       if (catalog.status === 'loading') {
         return h('div', { className: 'das-scroll' }, h('div', { className: 'das-note' }, copy.loading));
@@ -925,7 +950,41 @@ window.__ModuleLoader__.load({
                   });
                 }),
             Array.isArray(catalog.dormant) && catalog.dormant.length > 0
-              ? h('div', { className: 'das-hint' }, format(copy.moreDormant, { count: catalog.dormant.length }))
+              ? h(
+                  'div',
+                  { className: 'das-dormant' },
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'das-link',
+                      'aria-expanded': dormantOpen ? 'true' : 'false',
+                      onClick: function () {
+                        setDormantOpen(function (value) {
+                          return !value;
+                        });
+                      },
+                    },
+                    (dormantOpen ? '▾ ' : '▸ ')
+                      + format(copy.dormantTitle, { count: catalog.dormant.length })
+                      + ' · '
+                      + (dormantOpen ? copy.dormantHide : copy.dormantShow),
+                  ),
+                  dormantOpen
+                    ? h(
+                        'div',
+                        null,
+                        h('p', { className: 'das-hint', style: { margin: '6px 0' } }, copy.dormantHint),
+                        h(
+                          'div',
+                          { className: 'das-badges' },
+                          catalog.dormant.map(function (entry) {
+                            return h(Badge, { key: entry.id, tone: 'neutral', title: entry.displayName }, entry.id);
+                          }),
+                        ),
+                      )
+                    : null,
+                )
               : null,
           ),
         ),
@@ -1038,8 +1097,16 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'das-foot-actions' },
-              h('button', { type: 'button', className: 'das-btn', disabled: preview.yaml === '', onClick: onCopy }, copy.copy),
-              h('button', { type: 'button', className: 'das-btn das-btn-primary', disabled: preview.json === '', onClick: onDownload }, copy.download),
+              h(
+                'button',
+                { type: 'button', className: 'das-btn', disabled: preview.yaml === '' || preview.json === '', onClick: onCopy },
+                copyLabel,
+              ),
+              h(
+                'button',
+                { type: 'button', className: 'das-btn das-btn-primary', disabled: preview.yaml === '' || preview.json === '', onClick: onDownload },
+                downloadLabel,
+              ),
             ),
           ),
         ),

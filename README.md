@@ -71,6 +71,19 @@ left out:
 
 `apiKeyEnv` is a credential **reference name**, never a secret.
 
+### What "{count} catalog providers are still unconfigured" means
+
+The expandable line under the list counts the providers the **installed pi-ai catalog** ships (`openai`,
+`anthropic`, `groq`, `moonshotai`, `zai`… — 47 of them on a stock install) that **your profile does not
+configure**:
+
+- no `providers.<route>` entry → no `apiKeyEnv` (so no key), no `baseURL`, no chosen `models`;
+- so they cannot be exported (a snippet for them would be an empty shell) and they are kept out of the tick list;
+- add one in **Models settings → Add model provider** and it appears here, exportable.
+
+The line is there so "not listed" reads as "not configured here" rather than "the plugin cannot see it"; expanding it
+names them.
+
 ## Name collisions
 
 | Mode | Behaviour | When to use it |
@@ -168,7 +181,7 @@ Errors: `400 bad-body` / `400 not-confirmed`, `403 cross-origin`, `403 secrets-r
 
 ```powershell
 npm run check   # node --check on every shipped file
-npm test        # 98 assertions across 7 suites
+npm test        # 102 assertions across 7 suites
 ```
 
 | Suite | Covers |
@@ -179,7 +192,7 @@ npm test        # 98 assertions across 7 suites
 | `test/catalog.mjs` | the read tiers, namespace isolation, `!!js` skipping, target facts, request validation, credential gating |
 | `test/write.mjs` | locating the pi-ai row, the merge semantics of `configEditor.edit()`, every failure mapping |
 | `test/client.mjs` | the real components mounted through a miniature renderer (`test/harness.mjs`): dialog, collapsing groups, search, export preview, import plan, validation-disabled write |
-| `test/manifest.mjs` | publication and compatibility guards (manifest, exports, engines, imports, slots, routes, the single write path) |
+| `test/manifest.mjs` | publication and compatibility guards (manifest, exports, engines, imports, slots, routes, the single write path) plus layout guards (each column must scroll on its own, groups start collapsed) |
 
 ## Publishing checklist
 

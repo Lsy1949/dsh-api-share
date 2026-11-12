@@ -210,6 +210,23 @@ test('yaml: emitted text uses two-space indentation and no tabs', () => {
   assert.ok(!/js-yaml|from 'yaml'/.test(yaml), 'the emitter is dependency-free');
 });
 
+test('client: the dialog columns are bounded so each column scrolls on its own', () => {
+  const text = readFileSync(join(root, 'client.js'), 'utf8');
+  /* A grid row sized by content makes a `flex:1; overflow:auto` child grow past
+     the dialog, and the dialog's own `overflow:hidden` then clips the list — the
+     list must scroll, so the row has to be explicitly bounded. */
+  assert.match(text, /\.das-body\{[^}]*grid-template-rows:minmax\(0,1fr\)/);
+  assert.match(text, /\.das-body\{[^}]*min-height:0/);
+  assert.match(text, /\.das-col\{[^}]*min-height:0[^}]*overflow:hidden/);
+  assert.match(text, /\.das-scroll\{[^}]*overflow-y:auto[^}]*min-height:0[^}]*flex:1 1 0/);
+});
+
+test('client: every API group starts collapsed', () => {
+  const text = readFileSync(join(root, 'client.js'), 'utf8');
+  assert.match(text, /open\[provider\.id\] = false;/, 'the seeding effect must collapse every group');
+  assert.ok(!/open\[provider\.id\] = index === 0/.test(text), 'no group may be expanded by default');
+});
+
 test('package: every runtime file is present and non-empty', () => {
   for (const source of shippedSources()) {
     const size = statSync(join(root, source)).size;

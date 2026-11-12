@@ -67,6 +67,17 @@
 
 `apiKeyEnv` 是凭据**引用名**，不是密钥。
 
+### 「还有 N 个内置 provider 没有配置」是什么
+
+列表底部那行可展开的提示，指的是 **pi-ai 内置目录**里自带的 provider（`openai`、`anthropic`、`groq`、
+`moonshotai`、`zai`… 本机一共 47 个）。它们由已安装的目录提供，但**你的 profile 里没有它们的配置**：
+
+- 没有 `providers.<route>` 条目 → 没有 `apiKeyEnv`（没有 Key）、没有 `baseURL`、也没有选定 `models`；
+- 因此它们**不能导出**（导出等于导出一个空壳），也不该出现在可勾选列表里；
+- 想用它们，去「模型设置 → 添加模型 provider」添加一次，它就会出现在本插件的列表里并可导出。
+
+这行提示只是让你知道「不是插件看不到，而是本机确实还没配置」，点开可以看具体是哪些名字。
+
 ## 重名处理
 
 | 档位 | 行为 | 什么时候用 |
@@ -162,7 +173,7 @@ dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
 
 ```powershell
 npm run check   # 对每个发布文件跑 node --check
-npm test        # 7 个套件，98 条断言
+npm test        # 7 个套件，102 条断言
 ```
 
 | 套件 | 覆盖 |
@@ -173,7 +184,7 @@ npm test        # 7 个套件，98 条断言
 | `test/catalog.mjs` | 三级读取、命名空间隔离、`!!js` 跳过、目标事实、请求校验、凭据门禁 |
 | `test/write.mjs` | 定位 pi-ai 行、`configEditor.edit()` 的合并语义与各类失败映射 |
 | `test/client.mjs` | 用迷你渲染器（`test/harness.mjs`）挂载真实组件：打开对话框、折叠分组、搜索、导出预览、导入计划、校验失败禁用写入 |
-| `test/manifest.mjs` | 发布与兼容性守卫（清单、导出、engines、导入、插槽、路由、唯一写入路径） |
+| `test/manifest.mjs` | 发布与兼容性守卫（清单、导出、engines、导入、插槽、路由、唯一写入路径）＋布局守卫（列必须能独立滚动、分组默认收起） |
 
 ## 发布清单
 

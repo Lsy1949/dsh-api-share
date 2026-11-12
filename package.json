@@ -1,6 +1,6 @@
 {
   "name": "dsh-api-share",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Share and import the model provider configuration of a DeepSeek Harness profile: tick the APIs and models on the Models settings page, paste a snippet back when you need it, with ids that collide with the existing setup renamed adaptively.",
   "type": "module",
   "main": "index.js",

@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- The provider column could not scroll: the dialog's grid row was content-sized, so a `flex: 1; overflow: auto`
+  list grew past the dialog and was clipped by it. The row is now bounded (`grid-template-rows: minmax(0, 1fr)`),
+  each column owns its scroll area, and a layout guard in `test/manifest.mjs` keeps it that way.
+
+### Changed
+
+- Every API group starts **collapsed**; the dialog lists provider headers only until you open one.
+- The copy and download buttons follow the selected preview tab: YAML offers *Copy / Download YAML* (`.yml`), JSON
+  offers *Copy / Download JSON* (`.json`), instead of always copying YAML and downloading JSON.
+- The "N catalog providers are unconfigured" hint is now an expandable explanation that names them and says why
+  they cannot be exported.
+
 ## [0.2.0] - 2026-11-12
 
 ### Added

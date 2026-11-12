@@ -50,7 +50,7 @@ const CATALOG = {
     },
   ],
   skipped: [],
-  dormant: [],
+  dormant: [ { id: 'openai', displayName: 'OpenAI' }, { id: 'groq', displayName: 'Groq' } ],
   warnings: [],
 };
 
@@ -196,26 +196,67 @@ test('client: opening the dialog loads the catalogue and lists API groups', asyn
   assert.match(text, /Second API/);
 });
 
-test('client: each API group collapses and expands', async () => {
+test('client: every API group starts collapsed and toggles on demand', async () => {
   const { surface } = mountFooter();
   surface.clickText(/导入 \/ 导出配置/);
   await settle(surface);
 
-  /* The first group opens by itself, so its model list is visible… */
-  assert.match(surface.text(), /model-one/);
-  /* …while the second one starts collapsed. */
+  /* Both providers are listed, but no model list is rendered until asked. */
+  assert.match(surface.text(), /Relay/);
+  assert.match(surface.text(), /Second API/);
+  assert.doesNotMatch(surface.text(), /model-one/);
   assert.doesNotMatch(surface.text(), /claude-x/);
 
-  const headers = surface.byType('button').filter((element) => element.props['aria-controls'] !== undefined);
-  assert.equal(headers.length, 2, 'one collapsible header per provider');
+  const headers = () => surface.byType('button').filter((element) => element.props['aria-controls'] !== undefined);
+  assert.equal(headers().length, 2, 'one collapsible header per provider');
+  assert.equal(headers()[0].props['aria-expanded'], 'false', 'groups are collapsed by default');
 
-  headers[1].props.onClick();
+  headers()[0].props.onClick();
   surface.render();
-  assert.match(surface.text(), /claude-x/, 'expanding a group reveals its models');
+  assert.equal(headers()[0].props['aria-expanded'], 'true');
+  assert.match(surface.text(), /model-one/, 'expanding reveals the models');
 
-  surface.byType('button').filter((element) => element.props['aria-controls'] !== undefined)[1].props.onClick();
+  headers()[0].props.onClick();
   surface.render();
-  assert.doesNotMatch(surface.text(), /claude-x/, 'collapsing hides them again');
+  assert.doesNotMatch(surface.text(), /model-one/, 'collapsing hides them again');
+
+  surface.clickText(/展开全部/);
+  assert.match(surface.text(), /model-one/);
+  assert.match(surface.text(), /claude-x/);
+  surface.clickText(/收起全部/);
+  assert.doesNotMatch(surface.text(), /model-one/);
+});
+
+test('client: the copy and download buttons follow the selected format', async () => {
+  const { surface } = mountFooter();
+  surface.clickText(/导入 \/ 导出配置/);
+  await settle(surface);
+
+  assert.match(surface.text(), /复制 YAML/);
+  assert.match(surface.text(), /下载 YAML/);
+  assert.doesNotMatch(surface.text(), /下载 JSON/);
+
+  surface.clickText(/^JSON$/);
+  assert.match(surface.text(), /复制 JSON/);
+  assert.match(surface.text(), /下载 JSON/);
+  assert.doesNotMatch(surface.text(), /下载 YAML/);
+});
+
+test('client: the unconfigured catalogue providers are explained, not just counted', async () => {
+  const { surface } = mountFooter();
+  surface.clickText(/导入 \/ 导出配置/);
+  await settle(surface);
+
+  assert.match(surface.text(), /还有 2 个 provider 没有配置/);
+  assert.doesNotMatch(surface.text(), /openai/, 'the ids stay hidden until asked');
+
+  surface.clickText(/展开列表/);
+  assert.match(surface.text(), /openai/);
+  assert.match(surface.text(), /groq/);
+  assert.match(surface.text(), /内置目录/);
+
+  surface.clickText(/收起列表/);
+  assert.doesNotMatch(surface.text(), /groq/);
 });
 
 test('client: the search box filters providers and models', async () => {
