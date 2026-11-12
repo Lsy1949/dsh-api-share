@@ -339,7 +339,14 @@ window.__ModuleLoader__.load({
           '.das-col+.das-col{border-left:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-col-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.16));background:var(--dsw-alias-bg-layer-2,#1c1c20);position:sticky;top:0;z-index:2}',
           '.das-col-title{font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));margin:0;flex:1}',
-          '.das-scroll{overflow-y:auto;overflow-x:hidden;padding:12px 16px;min-height:0;flex:1 1 0;max-height:calc(88vh - 240px);display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain;scrollbar-gutter:stable}',
+          '.das-scroll{overflow-y:auto;overflow-x:hidden;padding:12px 16px;min-height:0;flex:1 1 0;max-height:100%;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain;scrollbar-gutter:stable}',
+          /* Children of a column flex container shrink by default, and a child
+             with overflow:hidden may shrink to zero — the groups compressed
+             instead of the column scrolling. Keep them at their content height. */
+          '.das-scroll>*{flex:0 0 auto;min-height:0}',
+          '.das-scroll>.das-pre{flex:1 1 auto;min-height:200px}',
+          '.das-group-count{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));margin-left:auto}',
+          '.das-link:disabled{opacity:.4;cursor:not-allowed;text-decoration:none}',
           /* provider accordion */
           '.das-dormant{margin-top:4px;padding-top:8px;border-top:1px dashed var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-group{border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.26));border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.05));overflow:hidden}',
@@ -597,30 +604,30 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'das-group-actions' },
                 h(
-                  'label',
-                  { className: 'das-model' },
-                  h('input', {
-                    type: 'checkbox',
-                    checked: total > 0 && chosen === total,
-                    onChange: function () {
-                      props.onAllModels(provider, total === 0 ? false : chosen !== total);
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'das-link',
+                    disabled: total === 0 || chosen === total,
+                    onClick: function () {
+                      props.onAllModels(provider, true);
                     },
-                  }),
-                  h('span', null, chosen === total && total > 0 ? props.copy.selectNone : props.copy.selectAll),
+                  },
+                  props.copy.selectAll,
                 ),
-                total > 0 && chosen > 0
-                  ? h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'das-link',
-                        onClick: function () {
-                          props.onAllModels(provider, false);
-                        },
-                      },
-                      props.copy.selectNone,
-                    )
-                  : null,
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'das-link',
+                    disabled: chosen === 0,
+                    onClick: function () {
+                      props.onAllModels(provider, false);
+                    },
+                  },
+                  props.copy.selectNone,
+                ),
+                h('span', { className: 'das-group-count' }, chosen + ' / ' + total),
               ),
               models.length === 0
                 ? h('div', { className: 'das-models-empty' }, props.copy.noModel)

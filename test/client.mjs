@@ -259,6 +259,35 @@ test('client: the unconfigured catalogue providers are explained, not just count
   assert.doesNotMatch(surface.text(), /groq/);
 });
 
+test('client: a group offers stable select-all and clear buttons, never two clears', async () => {
+  const { surface } = mountFooter();
+  surface.clickText(/导入 \/ 导出配置/);
+  await settle(surface);
+
+  surface.byType('button').filter((element) => element.props['aria-controls'] !== undefined)[0].props.onClick();
+  surface.render();
+
+  /* The group's own two actions are the only buttons with an explicit disabled
+     state; the toolbar above reuses the same words. */
+  const groupButtons = () =>
+    surface
+      .byType('button')
+      .filter((element) => typeof element.props.disabled === 'boolean')
+      .filter((element) => ['全选', '清空'].includes(surface.textOf(element)));
+  assert.deepEqual(groupButtons().map((element) => surface.textOf(element)), ['全选', '清空']);
+  assert.equal(groupButtons()[0].props.disabled, true, '全选 is disabled while everything is selected');
+  assert.match(surface.text(), /2 \/ 2/);
+
+  groupButtons()[1].props.onClick();
+  surface.render();
+  assert.match(surface.text(), /0 \/ 2/, 'clearing empties the group');
+  assert.deepEqual(groupButtons().map((element) => surface.textOf(element)), ['全选', '清空'], 'labels never swap');
+  assert.equal(groupButtons()[1].props.disabled, true, '清空 is disabled once nothing is selected');
+
+  groupButtons()[0].props.onClick();
+  surface.render();
+  assert.match(surface.text(), /2 \/ 2/);
+});
 test('client: the search box filters providers and models', async () => {
   const { surface } = mountFooter();
   surface.clickText(/导入 \/ 导出配置/);

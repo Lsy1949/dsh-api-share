@@ -7,10 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
-- The dialog collapsed to a sliver: the body was `flex: 1` inside a dialog that only declared `max-height`, so the
-  grid had no definite height to divide and both columns were squashed. The dialog now declares a definite
-  `height: min(88vh, 920px)`, the body's rows are `minmax(0, 1fr) auto`, and the scroll areas carry a
-  `calc(88vh - 240px)` safety net.
+- An expanded API group's model list still would not scroll: the scroll column is a flex column, its children shrink by default, and a child with `overflow: hidden` may shrink to zero — so the groups compressed and the column never overflowed. Children now keep their content height (`flex: 0 0 auto`), the preview is the one child allowed to grow, and the scroll area is bounded by its own column (`max-height: 100%`) instead of a viewport guess.
+- A group's select-all control flipped its own label once everything was selected, so the row showed two buttons reading "清空". The group now offers a fixed **全选** / **清空** pair that disables itself when it would do nothing, plus a `selected / total` count.
+- The dialog collapsed to a sliver: the body was `flex: 1` inside a dialog that only declared `max-height`, so the grid had no definite height to divide and both columns were squashed. The dialog now declares a definite
+  `height: min(88vh, 920px)` and the body's rows are `minmax(0, 1fr) auto`.
 - The provider column could not scroll: the dialog's grid row was content-sized, so a `flex: 1; overflow: auto`
   list grew past the dialog and was clipped by it. Each column now owns its scroll area, and layout guards in
   `test/manifest.mjs` keep it that way.

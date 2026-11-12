@@ -221,6 +221,8 @@ test('client: the dialog columns are bounded so each column scrolls on its own',
   assert.match(text, /\.das-body\{[^}]*min-height:0/);
   assert.match(text, /\.das-col\{[^}]*min-height:0[^}]*overflow:hidden/);
   assert.match(text, /\.das-scroll\{[^}]*overflow-y:auto[^}]*min-height:0[^}]*flex:1 1 0/);
+  /* Flex children shrink by default, and a child with overflow:hidden can shrink to zero — which squeezed the groups instead of scrolling the column. */
+  assert.match(text, /\.das-scroll>\*\{flex:0 0 auto/, 'the scroll column children must keep their content height');
   /* The action bar spans the dialog, not just one column. */
   assert.match(text, /\.das-foot\{[^}]*grid-column:1\/-1/);
 });
