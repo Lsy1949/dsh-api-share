@@ -1,0 +1,10 @@
+node_modules/
+.ref/
+.tmp-*
+*.log
+.DS_Store
+Thumbs.db
+
+# build/test leftovers
+coverage/
+*.tgz

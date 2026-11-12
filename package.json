@@ -1,0 +1,63 @@
+{
+  "name": "dsh-api-share",
+  "version": "0.1.0",
+  "description": "Share the model provider configuration of a DeepSeek Harness profile: tick the APIs and models on the Models settings page and get a paste-ready cordis.patch.yml snippet plus a JSON document, with ids that collide with the receiving side renamed adaptively.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "node": ">=24",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check client.js && node --check lib/host/plugin.js && node --check lib/host/catalog.js && node --check lib/host/routes.js",
+    "test": "node test/unit.mjs && node test/export.mjs && node test/catalog.mjs && node test/client.mjs && node test/manifest.mjs",
+    "verify": "npm run check && npm test",
+    "prepublishOnly": "npm run verify && npm pack --dry-run"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "lib/**/*.js",
+    "README.md",
+    "README.zh.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "model-provider",
+    "api",
+    "share",
+    "export",
+    "backup",
+    "migration"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lsy1949/dsh-api-share.git"
+  },
+  "homepage": "https://github.com/Lsy1949/dsh-api-share#readme",
+  "bugs": {
+    "url": "https://github.com/Lsy1949/dsh-api-share/issues"
+  },
+  "author": "Lsy1949",
+  "license": "MIT"
+}
