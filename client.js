@@ -4,7 +4,7 @@
  * Shape: a Module-Loader CJS factory (`window.__ModuleLoader__.load`), the same
  * lane every shipped client plugin uses. The loader calls `factory(require)`
  * once, lazily, the first time the plugin is needed; `require` resolves the
- * frozen platform table (`react`) plus the baseline externals.
+ * frozen platform table (`react`).
  *
  * Rules this file follows, because breaking them breaks the GUI:
  *
@@ -14,9 +14,13 @@
  *   2. Every registration is wrapped: a missing slot means a missing button,
  *      never a broken settings page.
  *   3. UI is React inside slots — no DOM hunting, no class-name anchors.
+ *   4. A crash renders a line of text, never an empty rectangle: every surface
+ *      sits behind its own error boundary.
  *
  * Surfaces:
- *   settings.models.footer   "导出配置" button + export dialog
+ *   settings.models.footer   "导入 / 导出配置" button + dialog
+ *     ├─ 导出: pick APIs and models, preview YAML/JSON, copy or download
+ *     └─ 导入: paste a snippet, preview the plan, apply it to the profile
  */
 window.__ModuleLoader__.load({
   id: 'dsh-api-share',
@@ -39,94 +43,169 @@ window.__ModuleLoader__.load({
 
     var TEXT = {
       zh: {
-        button: '导出配置',
-        buttonHint: '把已配置的 API 与模型导出为 cordis.patch.yml 片段或 JSON 文件。',
-        title: '导出模型配置',
-        subtitle: '选择要导出的 API 和模型，导出结果可直接粘贴到目标 profile 的 cordis.patch.yml。',
+        entry: '导入 / 导出配置',
+        entryHint: '把已配置的 API 与模型导出为 cordis.patch.yml 片段或 JSON，也可以把片段导入回本机。',
+        title: '模型配置分享',
+        tabExport: '导出',
+        tabImport: '导入',
         close: '关闭',
+        loading: '正在读取已配置的 API…',
         loadFailed: '读取配置失败：',
         retry: '重试',
-        loading: '正在读取已配置的 API…',
         empty: '这个 profile 里还没有可导出的 provider。请先在模型设置里添加 API。',
-        providers: 'API / 模型',
+        search: '搜索 provider 或模型…',
+        expandAll: '展开全部',
+        collapseAll: '收起全部',
         selectAll: '全选',
-        clear: '清空',
-        selectedCount: '已选 {providers} 个 API、{models} 个模型',
-        options: '选项',
+        selectNone: '清空',
+        apiBadge: 'API',
+        secretOk: '密钥已配置',
+        secretMissing: '密钥缺失',
+        inherited: '容量取自内置目录',
+        noModel: '没有模型',
+        exportOptions: '导出选项',
         namingLabel: '重名处理',
         namingAuto: '仅真实冲突时自动改名',
-        namingAlways: '总是加后缀（合并进同一套配置时用）',
+        namingAlways: '总是加后缀',
         namingOff: '保持原名',
         namingHint: '目标环境已有同名但连接信息不同的 provider 时自动加后缀（foo → foo-2），预览会标出每一次改名。',
-        inheritNote: '这些模型的容量来自内置目录，导出时只写 id。',
-        catalogTag: '目录',
         secretsLabel: '包含明文 API Key',
-        secretsHint: '默认只导出 apiKeyEnv 引用；勾选后会把密钥写进注释，请自行保管导出文件。',
-        secretsUnavailable: '本环境读不到任何密钥值，只能导出引用。',
+        secretsHint: '默认只导出 apiKeyEnv 引用；勾选后密钥写在注释里，请自行保管。',
+        secretsUnavailable: '本环境读不到密钥值，只能导出引用。',
         preview: '预览',
-        yamlTab: 'YAML 片段',
+        yamlTab: 'YAML',
         jsonTab: 'JSON',
         previewEmpty: '勾选至少一个模型后显示预览。',
         previewBusy: '正在生成…',
         previewFailed: '生成失败：',
         copy: '复制 YAML',
-        copied: '已复制',
+        copied: '已复制到剪贴板',
         copyFailed: '复制失败，请手动选择文本。',
         download: '下载 JSON',
-        downloaded: '已下载',
+        downloaded: '已开始下载',
+        selected: '已选 {providers} 个 API · {models} 个模型',
         renames: '已自动改名',
         identical: '与现有配置一致',
         warnings: '提示',
-        secretsIncluded: '已包含明文密钥',
         skipped: '未导出',
-        noModel: '没有模型',
-        modelsCount: '{count} 个模型',
-        a11y: '导出模型配置对话框',
+        secretsIncluded: '已包含明文密钥',
+        moreDormant: '另有 {count} 个内置 provider 未配置',
+        /* import */
+        importTitle: '导入配置',
+        importHint: '粘贴之前导出的 YAML 片段或 JSON 文件内容，先预览会改什么，再写进本 profile。',
+        pasteLabel: '配置片段',
+        pastePlaceholder: '在此粘贴 cordis.patch.yml 片段，或 JSON 导出文件的内容…',
+        chooseFile: '选择文件…',
+        dropHint: '也可以把 .yml / .yaml / .json 文件拖到这里',
+        clearText: '清空',
+        policyLabel: '冲突处理',
+        policyMerge: '保留现有，冲突项改名',
+        policySkip: '保留现有，冲突项跳过',
+        policyOverwrite: '冲突项用导入内容覆盖',
+        policyHint: '与现有 provider 同名时：改名会新建一个 foo-2，跳过则不动，覆盖会替换原有整段配置。',
+        previewPlan: '导入预览',
+        planEmpty: '粘贴片段后自动生成预览。',
+        planBusy: '正在解析…',
+        planFailed: '解析失败：',
+        actionCreate: '新增',
+        actionRename: '改名新增',
+        actionUpdate: '覆盖',
+        actionUnchanged: '已存在',
+        actionSkip: '跳过',
+        actionInvalid: '无效',
+        modelsAdded: '模型 {count}',
+        apply: '写入配置',
+        applying: '正在写入…',
+        applied: '已写入，重启或重载 DSH 后生效',
+        applyFailed: '写入失败：',
+        applyNoChange: '没有需要写入的改动',
+        validationFailed: '写入前校验未通过：',
+        cannotWrite: '当前环境不支持从插件写入配置，导入已禁用。',
+        needConfirm: '写入会修改本 profile 的 cordis.patch.yml，请确认预览内容。',
+        summary: '新增 {create} · 改名 {rename} · 覆盖 {update} · 已存在 {unchanged} · 跳过 {skip} · 无效 {invalid}',
+        a11y: '模型配置分享对话框',
       },
       en: {
-        button: 'Export configuration',
-        buttonHint: 'Export the configured APIs and models as a cordis.patch.yml snippet or a JSON file.',
-        title: 'Export model configuration',
-        subtitle: 'Pick the APIs and models to export. The result pastes straight into the target profile’s cordis.patch.yml.',
+        entry: 'Import / export configuration',
+        entryHint: 'Export the configured APIs and models as a cordis.patch.yml snippet or JSON — or import one back.',
+        title: 'Share model configuration',
+        tabExport: 'Export',
+        tabImport: 'Import',
         close: 'Close',
+        loading: 'Reading the configured APIs…',
         loadFailed: 'Could not read the configuration: ',
         retry: 'Retry',
-        loading: 'Reading the configured APIs…',
         empty: 'No exportable provider in this profile yet. Add an API in Models settings first.',
-        providers: 'APIs / models',
+        search: 'Search providers or models…',
+        expandAll: 'Expand all',
+        collapseAll: 'Collapse all',
         selectAll: 'All',
-        clear: 'None',
-        selectedCount: '{providers} APIs, {models} models selected',
-        options: 'Options',
+        selectNone: 'None',
+        apiBadge: 'API',
+        secretOk: 'key configured',
+        secretMissing: 'key missing',
+        inherited: 'capacities from the installed catalog',
+        noModel: 'no models',
+        exportOptions: 'Export options',
         namingLabel: 'Name collisions',
         namingAuto: 'Rename only on a real collision',
-        namingAlways: 'Always add a suffix (merging into the same setup)',
+        namingAlways: 'Always add a suffix',
         namingOff: 'Keep every name',
         namingHint: 'A provider the target already owns under this id with a different connection gets a numeric suffix (foo → foo-2); the preview lists every rename.',
-        inheritNote: 'These model capacities come from the installed catalog, so only their ids are exported.',
-        catalogTag: 'catalog',
         secretsLabel: 'Include plaintext API keys',
-        secretsHint: 'Only the apiKeyEnv reference is exported by default. Ticking this writes the key into a comment — keep the file private.',
+        secretsHint: 'Only the apiKeyEnv reference is exported by default; ticking this writes the key into a comment.',
         secretsUnavailable: 'No credential value is readable here, so only references can be exported.',
         preview: 'Preview',
-        yamlTab: 'YAML snippet',
+        yamlTab: 'YAML',
         jsonTab: 'JSON',
         previewEmpty: 'Select at least one model to see the preview.',
         previewBusy: 'Generating…',
         previewFailed: 'Generation failed: ',
         copy: 'Copy YAML',
-        copied: 'Copied',
+        copied: 'Copied to the clipboard',
         copyFailed: 'Copy failed — select the text manually.',
         download: 'Download JSON',
-        downloaded: 'Downloaded',
+        downloaded: 'Download started',
+        selected: '{providers} APIs · {models} models selected',
         renames: 'Renamed automatically',
         identical: 'Identical to the current configuration',
         warnings: 'Notes',
-        secretsIncluded: 'Plaintext keys included',
         skipped: 'Not exported',
-        noModel: 'no models',
-        modelsCount: '{count} models',
-        a11y: 'Export model configuration dialog',
+        secretsIncluded: 'Plaintext keys included',
+        moreDormant: '{count} more catalog providers are not configured',
+        importTitle: 'Import configuration',
+        importHint: 'Paste a previously exported YAML snippet or JSON file, preview what would change, then write it into this profile.',
+        pasteLabel: 'Snippet',
+        pastePlaceholder: 'Paste a cordis.patch.yml snippet, or the contents of a JSON export…',
+        chooseFile: 'Choose a file…',
+        dropHint: 'You can also drop a .yml / .yaml / .json file here',
+        clearText: 'Clear',
+        policyLabel: 'Collisions',
+        policyMerge: 'Keep existing, rename the import',
+        policySkip: 'Keep existing, skip the import',
+        policyOverwrite: 'Overwrite with the import',
+        policyHint: 'When a provider id already exists: rename creates foo-2, skip leaves it alone, overwrite replaces the whole provider.',
+        previewPlan: 'Import preview',
+        planEmpty: 'The preview appears as soon as you paste a snippet.',
+        planBusy: 'Parsing…',
+        planFailed: 'Could not parse: ',
+        actionCreate: 'New',
+        actionRename: 'New (renamed)',
+        actionUpdate: 'Replace',
+        actionUnchanged: 'Already there',
+        actionSkip: 'Skipped',
+        actionInvalid: 'Invalid',
+        modelsAdded: '{count} models',
+        apply: 'Write configuration',
+        applying: 'Writing…',
+        applied: 'Written — restart or reload DSH to apply',
+        applyFailed: 'Write failed: ',
+        applyNoChange: 'Nothing to write',
+        validationFailed: 'The adapter refused this plan: ',
+        cannotWrite: 'This environment does not allow a plugin to write configuration, so import is disabled.',
+        needConfirm: 'Writing modifies this profile’s cordis.patch.yml; check the preview first.',
+        summary: 'new {create} · renamed {rename} · replaced {update} · existing {unchanged} · skipped {skip} · invalid {invalid}',
+        a11y: 'Share model configuration dialog',
       },
     };
 
@@ -142,7 +221,12 @@ window.__ModuleLoader__.load({
       try {
         if (locale === null || locale === undefined) return 'zh';
         var current = typeof locale.getLocale === 'function' ? locale.getLocale() : undefined;
-        var id = typeof current === 'string' ? current : current !== null && current !== undefined && typeof current.id === 'string' ? current.id : '';
+        var id = '';
+        if (typeof current === 'string') id = current;
+        else if (current !== null && current !== undefined) {
+          if (typeof current.id === 'string') id = current.id;
+          else if (typeof current.active === 'string') id = current.active;
+        }
         return String(id).toLowerCase().indexOf('en') === 0 ? 'en' : 'zh';
       } catch (error) {
         return 'zh';
@@ -202,54 +286,86 @@ window.__ModuleLoader__.load({
         style.setAttribute('data-plugin', PACKAGE_ID);
         style.setAttribute('data-plugin-css', PACKAGE_ID + '-styles');
         style.textContent = [
-          '.das-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0 2px;margin-top:8px;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28))}',
-          '.das-row-text{display:flex;flex-direction:column;gap:2px;min-width:220px;flex:1}',
+          /* entry row */
+          '.das-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px;margin-top:10px;border:1px solid var(--dsw-alias-settings-card-stroke,rgba(128,128,128,.28));border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.06))}',
+          '.das-row-text{display:flex;flex-direction:column;gap:3px;min-width:240px;flex:1}',
           '.das-row-title{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary,inherit)}',
-          '.das-row-hint{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
-          '.das-btn{appearance:none;border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.32));background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.1));color:var(--dsw-alias-label-primary,inherit);border-radius:var(--dsw-radius-sm,8px);padding:7px 14px;font-size:13px;line-height:1.2;cursor:pointer;font-family:inherit}',
-          '.das-btn:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.2))}',
+          '.das-row-hint{font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
+          /* controls */
+          '.das-btn{appearance:none;border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.32));background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.1));color:var(--dsw-alias-label-primary,inherit);border-radius:var(--dsw-radius-sm,8px);padding:7px 14px;font-size:13px;line-height:1.2;cursor:pointer;font-family:inherit;transition:background var(--ds-transition-duration,120ms) var(--ds-ease-in-out,ease)}',
+          '.das-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.2))}',
           '.das-btn:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,#4c8dff);outline-offset:2px}',
-          '.das-btn:disabled{opacity:.5;cursor:not-allowed}',
+          '.das-btn:disabled{opacity:.45;cursor:not-allowed}',
           '.das-btn-primary{background:var(--dsw-alias-button-primary-fill,#3b6fe0);border-color:var(--dsw-alias-button-primary-fill,#3b6fe0);color:var(--dsw-alias-label-primary-foreground,#fff)}',
-          '.das-btn-primary:hover{background:var(--dsw-alias-button-primary-hover,#3561c9)}',
-          '.das-backdrop{position:fixed;inset:0;background:var(--dsw-alias-bg-mask-1,rgba(0,0,0,.48));display:flex;align-items:center;justify-content:center;padding:24px;z-index:1000}',
-          '.das-dialog{width:min(960px,100%);max-height:min(86vh,900px);display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-2,#1c1c20);color:var(--dsw-alias-label-primary,#eee);border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.32));border-radius:var(--dsw-radius-lg,16px);box-shadow:var(--dsw-elevation-prominent,0 24px 64px rgba(0,0,0,.45));overflow:hidden}',
-          '.das-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px 12px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28))}',
-          '.das-head h2{margin:0;font-size:16px;font-weight:650;line-height:1.3}',
-          '.das-sub{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));max-width:70ch}',
-          '.das-body{display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.1fr);min-height:0;flex:1}',
-          '.das-col{min-height:0;overflow:auto;padding:16px 20px}',
-          '.das-col+.das-col{border-left:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28));display:flex;flex-direction:column;gap:10px}',
-          '.das-section-title{font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));margin:0 0 10px}',
-          '.das-provider{border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28));border-radius:var(--dsw-radius-md,12px);margin-bottom:10px;overflow:hidden}',
-          '.das-provider-head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.08))}',
-          '.das-provider-meta{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}',
-          '.das-provider-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-          '.das-provider-sub{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-          '.das-models{padding:6px 12px 10px;display:flex;flex-direction:column;gap:2px}',
-          '.das-model{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;color:var(--dsw-alias-label-primary,inherit);cursor:pointer}',
-          '.das-model-id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-          '.das-model-name{color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));font-size:11px}',
-          '.das-model-actions{display:flex;gap:8px;padding:0 12px 6px}',
+          '.das-btn-primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,#3561c9)}',
+          '.das-btn-sm{padding:4px 10px;font-size:12px;border-radius:var(--dsw-radius-xs,4px)}',
+          '.das-input,.das-select,.das-textarea{font-family:inherit;font-size:12px;color:var(--dsw-alias-label-primary,inherit);background:var(--dsw-alias-bg-layer-1,#18181b);border:1px solid var(--dsw-alias-border-l4,rgba(128,128,128,.4));border-radius:var(--dsw-radius-xs,4px);padding:6px 8px}',
+          '.das-input:focus-visible,.das-select:focus-visible,.das-textarea:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,#4c8dff);outline-offset:1px}',
+          '.das-textarea{width:100%;min-height:150px;resize:vertical;font-family:var(--ds-font-family-code,ui-monospace,Menlo,Consolas,monospace);line-height:1.5}',
+          '.das-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}',
+          '.das-label{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary,inherit)}',
+          '.das-hint{font-size:11px;line-height:1.55;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
+          '.das-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
           '.das-link{appearance:none;background:none;border:0;padding:0;color:var(--dsw-alias-state-business-primary,#5b8cff);font-size:12px;cursor:pointer;font-family:inherit}',
           '.das-link:hover{text-decoration:underline}',
-          '.das-option{display:flex;gap:8px;align-items:flex-start;margin:0 0 12px;font-size:12px;line-height:1.55}',
-          '.das-option input{margin-top:2px}',
-          '.das-option-text{display:flex;flex-direction:column;gap:2px}',
-          '.das-option-hint{color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));font-size:11px}',
-          '.das-select{font-family:inherit;font-size:12px;padding:5px 8px;border-radius:var(--dsw-radius-xs,4px);border:1px solid var(--dsw-alias-border-l4,rgba(128,128,128,.4));background:var(--dsw-alias-bg-layer-1,#18181b);color:var(--dsw-alias-label-primary,inherit)}',
-          '.das-tabs{display:flex;gap:6px}',
-          '.das-tab{appearance:none;border:1px solid transparent;background:none;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));font-size:12px;padding:4px 8px;border-radius:var(--dsw-radius-xs,4px);cursor:pointer;font-family:inherit}',
-          '.das-tab[aria-selected="true"]{background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.16));color:var(--dsw-alias-label-primary,inherit);border-color:var(--dsw-alias-border-l3,rgba(128,128,128,.28))}',
-          '.das-pre{margin:0;flex:1;min-height:180px;max-height:46vh;overflow:auto;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.08));border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28));border-radius:var(--dsw-radius-md,12px);padding:12px;font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);font-size:12px;line-height:1.55;white-space:pre;tab-size:2}',
-          '.das-note{font-size:12px;line-height:1.55;border-radius:var(--dsw-radius-sm,8px);padding:8px 10px;border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28))}',
-          '.das-note-ok{color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
-          '.das-note-warn{color:var(--dsw-alias-state-warn-label,#e0b055);border-color:rgba(224,176,85,.4);background:rgba(224,176,85,.08)}',
-          '.das-note-error{color:var(--dsw-alias-state-error-primary,#e07a7a);border-color:rgba(224,122,122,.4);background:rgba(224,122,122,.08)}',
-          '.das-list{margin:4px 0 0;padding-left:16px;font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
-          '.das-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28));flex-wrap:wrap}',
+          /* dialog shell */
+          '.das-backdrop{position:fixed;inset:0;background:var(--dsw-alias-bg-mask-1,rgba(0,0,0,.48));display:flex;align-items:center;justify-content:center;padding:24px;z-index:1000}',
+          '.das-dialog{width:min(1040px,100%);max-height:min(88vh,920px);display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-2,#1c1c20);color:var(--dsw-alias-label-primary,#eee);border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.32));border-radius:var(--dsw-radius-lg,16px);box-shadow:var(--dsw-elevation-prominent,0 24px 64px rgba(0,0,0,.45));overflow:hidden}',
+          '.das-head{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
+          '.das-head-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}',
+          '.das-head h2{margin:0;font-size:16px;font-weight:650;line-height:1.25}',
+          '.das-sub{margin:0;font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
+          '.das-tabs{display:inline-flex;padding:3px;gap:2px;border-radius:var(--dsw-radius-sm,8px);background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.12))}',
+          '.das-tab{appearance:none;border:0;background:none;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));font-size:12px;font-weight:600;padding:5px 14px;border-radius:var(--dsw-radius-xs,4px);cursor:pointer;font-family:inherit}',
+          '.das-tab[aria-selected="true"]{background:var(--dsw-alias-bg-layer-1,#18181b);color:var(--dsw-alias-label-primary,inherit);box-shadow:0 0 0 1px var(--dsw-alias-border-l3,rgba(128,128,128,.3))}',
+          '.das-tab:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,#4c8dff);outline-offset:2px}',
+          /* body */
+          '.das-body{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(360px,1fr);min-height:0;flex:1}',
+          '.das-col{display:flex;flex-direction:column;min-height:0;min-width:0}',
+          '.das-col+.das-col{border-left:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
+          '.das-col-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.16));background:var(--dsw-alias-bg-layer-2,#1c1c20);position:sticky;top:0;z-index:2}',
+          '.das-col-title{font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));margin:0;flex:1}',
+          '.das-scroll{overflow:auto;padding:12px 16px;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px}',
+          /* provider accordion */
+          '.das-group{border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.26));border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.05));overflow:hidden}',
+          '.das-group[data-selected="false"]{opacity:.72}',
+          '.das-group-head{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;width:100%;text-align:left;background:none;border:0;color:inherit;font-family:inherit}',
+          '.das-group-head:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.09))}',
+          '.das-group-head:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,#4c8dff);outline-offset:-2px}',
+          '.das-chevron{flex:0 0 auto;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));transition:transform var(--ds-transition-duration,120ms) var(--ds-ease-in-out,ease)}',
+          '.das-chevron[data-open="true"]{transform:rotate(90deg)}',
+          '.das-group-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}',
+          '.das-group-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+          '.das-group-sub{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+          '.das-group-body{border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.16));padding:8px 12px 10px}',
+          '.das-group-actions{display:flex;gap:10px;padding:2px 0 8px}',
+          '.das-model{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer;min-width:0}',
+          '.das-model-id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--ds-font-family-code,ui-monospace,Menlo,Consolas,monospace)}',
+          '.das-model-name{color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+          '.das-models-empty{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));padding:2px 0}',
+          /* badges */
+          '.das-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}',
+          '.das-badge{font-size:10px;line-height:1.6;padding:0 6px;border-radius:999px;border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.3));color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));white-space:nowrap}',
+          '.das-badge[data-tone="ok"]{color:var(--dsw-alias-state-success-primary,#4caf82);border-color:rgba(76,175,130,.45)}',
+          '.das-badge[data-tone="warn"]{color:var(--dsw-alias-state-warn-label,#e0b055);border-color:rgba(224,176,85,.45)}',
+          '.das-badge[data-tone="error"]{color:var(--dsw-alias-state-error-primary,#e07a7a);border-color:rgba(224,122,122,.45)}',
+          '.das-badge[data-tone="accent"]{color:var(--dsw-alias-state-business-primary,#5b8cff);border-color:rgba(91,140,255,.45)}',
+          /* preview + notes */
+          '.das-pre{margin:0;flex:1;min-height:200px;overflow:auto;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.08));border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.26));border-radius:var(--dsw-radius-md,12px);padding:12px;font-family:var(--ds-font-family-code,ui-monospace,Menlo,Consolas,monospace);font-size:12px;line-height:1.55;white-space:pre;tab-size:2}',
+          '.das-note{font-size:12px;line-height:1.55;border-radius:var(--dsw-radius-sm,8px);padding:8px 10px;border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24));color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
+          '.das-note[data-tone="warn"]{color:var(--dsw-alias-state-warn-label,#e0b055);border-color:rgba(224,176,85,.4);background:rgba(224,176,85,.07)}',
+          '.das-note[data-tone="error"]{color:var(--dsw-alias-state-error-primary,#e07a7a);border-color:rgba(224,122,122,.4);background:rgba(224,122,122,.07)}',
+          '.das-list{margin:5px 0 0;padding-left:16px;font-size:11px;line-height:1.6}',
+          '.das-plan{display:flex;flex-direction:column;gap:6px}',
+          '.das-plan-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.22));border-radius:var(--dsw-radius-sm,8px)}',
+          '.das-plan-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}',
+          '.das-plan-name{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+          '.das-plan-reason{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));line-height:1.5}',
+          /* footer */
+          '.das-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24));flex-wrap:wrap}',
+          '.das-foot-status{font-size:12px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));min-width:0;flex:1}',
           '.das-foot-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}',
-          '@media (max-width:760px){.das-body{grid-template-columns:1fr}.das-col+.das-col{border-left:0;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.28))}}',
+          '@media (max-width:820px){.das-body{grid-template-columns:1fr}.das-col+.das-col{border-left:0;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}}',
         ].join('\n');
         document.head.appendChild(style);
       } catch (error) {
@@ -258,7 +374,7 @@ window.__ModuleLoader__.load({
     }
 
     /* ------------------------------------------------------------------ */
-    /* transport                                                          */
+    /* transport + clipboard + download                                    */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -277,8 +393,12 @@ window.__ModuleLoader__.load({
           if (!response.ok || payload === null || payload.ok !== true) {
             var detail = payload !== null && typeof payload === 'object' && typeof payload.detail === 'string'
               ? payload.detail
-              : 'HTTP ' + response.status;
-            throw new Error(detail);
+              : payload !== null && typeof payload === 'object' && typeof payload.error === 'string'
+                ? payload.error
+                : 'HTTP ' + response.status;
+            var error = new Error(detail);
+            error.payload = payload;
+            throw error;
           }
           return payload;
         });
@@ -287,8 +407,7 @@ window.__ModuleLoader__.load({
 
     /**
      * Copy text, falling back to a hidden textarea on browsers that refuse the
-     * async clipboard (the GUI is http://127.0.0.1, which counts as secure, but
-     * a hosting shell may not be).
+     * async clipboard.
      * @param {string} text
      * @returns {Promise<boolean>}
      */
@@ -330,6 +449,7 @@ window.__ModuleLoader__.load({
      * @param {string} filename
      * @param {string} text
      * @param {string} mime
+     * @returns {boolean}
      */
     function downloadText(filename, text, mime) {
       try {
@@ -352,7 +472,7 @@ window.__ModuleLoader__.load({
     }
 
     /* ------------------------------------------------------------------ */
-    /* dialog                                                             */
+    /* small hooks + bits                                                 */
     /* ------------------------------------------------------------------ */
 
     function useEscapeKey(active, onEscape) {
@@ -371,116 +491,165 @@ window.__ModuleLoader__.load({
       }, [active, onEscape]);
     }
 
+    /** @param {string} text */
+    function Badge(props) {
+      return h(
+        'span',
+        { className: 'das-badge', 'data-tone': props.tone === undefined ? 'neutral' : props.tone, title: props.title },
+        props.children,
+      );
+    }
+
+    /** @param {{ count: number }} props */
+    function CountBadge(props) {
+      return h(Badge, { tone: props.count > 0 ? 'accent' : 'neutral' }, props.count);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* export panel                                                       */
+    /* ------------------------------------------------------------------ */
+
     /**
-     * One provider row: checkbox for the provider, checkboxes for its models.
-     * @param {{ provider: any, selected: Record<string, boolean>, onToggleProvider: Function, onToggleModel: Function, onAllModels: Function, copy: any }} props
+     * One provider group: a header (checkbox, name, badges, model count) that
+     * expands and collapses the model list underneath.
+     *
+     * @param {any} props
      */
-    function ProviderRow(props) {
+    function ProviderGroup(props) {
       var provider = props.provider;
-      var models = Array.isArray(provider.models) ? provider.models : [];
-      var chosen = models.filter(function (model) {
-        return props.selected[model.id] === true;
+      var models = Array.isArray(provider.models) ? props.visibleModels : [];
+      var modelState = props.selected[provider.id] || {};
+      var chosen = Object.keys(modelState).filter(function (id) {
+        return modelState[id] === true;
       }).length;
-      var all = models.length > 0 && chosen === models.length;
+      var total = Array.isArray(provider.models) ? provider.models.length : 0;
+      var open = props.expanded === true;
+
+      var badges = [];
+      if (provider.api) badges.push(h(Badge, { key: 'api', tone: 'neutral' }, provider.api));
+      if (provider.apiKeyEnv) {
+        badges.push(
+          h(
+            Badge,
+            { key: 'key', tone: provider.hasCredential ? 'ok' : 'warn', title: provider.apiKeyEnv },
+            provider.hasCredential ? props.copy.secretOk : props.copy.secretMissing,
+          ),
+        );
+      }
+      if (provider.handDeclared) badges.push(h(Badge, { key: 'hand', tone: 'neutral' }, 'hand-declared'));
+      if (provider.inheritsModels) badges.push(h(Badge, { key: 'inh', tone: 'neutral', title: props.copy.inherited }, 'catalog'));
+      if (provider.defaultBaseURL && !provider.baseURL) {
+        badges.push(h(Badge, { key: 'def', tone: 'neutral', title: provider.defaultBaseURL }, 'default endpoint'));
+      }
 
       return h(
         'div',
-        { className: 'das-provider' },
+        { className: 'das-group', 'data-selected': chosen > 0 ? 'true' : 'false' },
         h(
           'div',
-          { className: 'das-provider-head' },
-          h('input', {
-            type: 'checkbox',
-            checked: all,
-            'aria-label': provider.id,
-            onChange: function () {
-              props.onAllModels(provider, !all);
-            },
-          }),
+          { className: 'das-inline', style: { gap: '0' } },
           h(
-            'div',
-            { className: 'das-provider-meta' },
-            h('span', { className: 'das-provider-name' }, provider.displayName || provider.id),
+            'button',
+            {
+              type: 'button',
+              className: 'das-group-head',
+              'aria-expanded': open ? 'true' : 'false',
+              'aria-controls': 'das-models-' + provider.id,
+              onClick: function () {
+                props.onToggleOpen(provider.id);
+              },
+            },
+            h('span', { className: 'das-chevron', 'data-open': open ? 'true' : 'false', 'aria-hidden': 'true' }, '▶'),
             h(
               'span',
-              { className: 'das-provider-sub' },
-              [provider.id, provider.api, provider.apiKeyEnv].filter(Boolean).join(' · '),
+              { className: 'das-group-main' },
+              h('span', { className: 'das-group-name' }, provider.displayName || provider.id),
+              h('span', { className: 'das-group-sub' }, [provider.id, provider.baseURL].filter(Boolean).join(' · ')),
+            ),
+            h(
+              'span',
+              { className: 'das-badges' },
+              badges,
+              h(CountBadge, { count: chosen + '/' + total }),
             ),
           ),
-          h('span', { className: 'das-provider-sub' }, format(props.copy.modelsCount, { count: chosen })),
         ),
-        h(
-          'div',
-          { className: 'das-model-actions' },
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'das-link',
-              onClick: function () {
-                props.onAllModels(provider, true);
-              },
-            },
-            props.copy.selectAll,
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'das-link',
-              onClick: function () {
-                props.onAllModels(provider, false);
-              },
-            },
-            props.copy.clear,
-          ),
-        ),
-        h(
-          'div',
-          { className: 'das-models' },
-          models.length === 0
-            ? h('span', { className: 'das-provider-sub' }, props.copy.noModel)
-            : models.map(function (model) {
-                return h(
+        open
+          ? h(
+              'div',
+              { className: 'das-group-body', id: 'das-models-' + provider.id },
+              h(
+                'div',
+                { className: 'das-group-actions' },
+                h(
                   'label',
-                  { className: 'das-model', key: model.id },
+                  { className: 'das-model' },
                   h('input', {
                     type: 'checkbox',
-                    checked: props.selected[model.id] === true,
+                    checked: total > 0 && chosen === total,
                     onChange: function () {
-                      props.onToggleModel(provider, model.id);
+                      props.onAllModels(provider, total === 0 ? false : chosen !== total);
                     },
                   }),
-                  h('span', { className: 'das-model-id' }, model.id),
-                  model.name !== '' && model.name !== model.id
-                    ? h('span', { className: 'das-model-name' }, model.name)
-                    : null,
-                  model.origin === 'catalog'
-                    ? h('span', { className: 'das-model-name' }, '· ' + props.copy.catalogTag)
-                    : null,
-                );
-              }),
-          provider.inheritsModels === true
-            ? h('span', { className: 'das-provider-sub', style: { paddingTop: '4px' } }, props.copy.inheritNote)
-            : null,
-        ),
+                  h('span', null, chosen === total && total > 0 ? props.copy.selectNone : props.copy.selectAll),
+                ),
+                total > 0 && chosen > 0
+                  ? h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'das-link',
+                        onClick: function () {
+                          props.onAllModels(provider, false);
+                        },
+                      },
+                      props.copy.selectNone,
+                    )
+                  : null,
+              ),
+              models.length === 0
+                ? h('div', { className: 'das-models-empty' }, props.copy.noModel)
+                : models.map(function (model) {
+                    return h(
+                      'label',
+                      { className: 'das-model', key: model.id },
+                      h('input', {
+                        type: 'checkbox',
+                        checked: modelState[model.id] === true,
+                        onChange: function () {
+                          props.onToggleModel(provider, model.id);
+                        },
+                      }),
+                      h('span', { className: 'das-model-id' }, model.id),
+                      model.name !== '' && model.name !== model.id
+                        ? h('span', { className: 'das-model-name' }, model.name)
+                        : null,
+                      model.origin === 'catalog' ? h(Badge, { tone: 'neutral', title: props.copy.inherited }, 'catalog') : null,
+                    );
+                  }),
+              provider.inheritsModels === true
+                ? h('div', { className: 'das-models-empty', style: { paddingTop: '6px' } }, props.copy.inherited)
+                : null,
+            )
+          : null,
       );
     }
 
     /**
-     * The export dialog. Owns the catalogue read, the selection, the preview and
-     * the two artefacts; every failure becomes a visible line, never a crash.
-     * @param {{ open: boolean, onClose: Function, copy: any }} props
+     * The export pane: catalogue on the left, options and preview on the right.
+     * @param {{ copy: any, catalog: any, onReload: Function, active: boolean }} props
      */
-    function ExportDialog(props) {
+    function ExportPanel(props) {
       var copy = props.copy;
-      var catalogState = React.useState({ status: 'loading', providers: [], skipped: [], sources: {}, secretsAvailable: false, error: '' });
-      var catalog = catalogState[0];
-      var setCatalog = catalogState[1];
+      var catalog = props.catalog;
 
       var selectionState = React.useState({});
       var selected = selectionState[0];
       var setSelected = selectionState[1];
+
+      var openState = React.useState({});
+      var expanded = openState[0];
+      var setExpanded = openState[1];
 
       var modeState = React.useState('auto');
       var mode = modeState[0];
@@ -490,84 +659,68 @@ window.__ModuleLoader__.load({
       var includeSecrets = secretsState[0];
       var setIncludeSecrets = secretsState[1];
 
-      var previewState = React.useState({ status: 'idle', yaml: '', json: '', renames: [], identical: [], warnings: [], error: '' });
-      var preview = previewState[0];
-      var setPreview = previewState[1];
-
       var tabState = React.useState('yaml');
       var tab = tabState[0];
       var setTab = tabState[1];
 
-      var statusState = React.useState('');
-      var status = statusState[0];
-      var setStatus = statusState[1];
+      var searchState = React.useState('');
+      var search = searchState[0];
+      var setSearch = searchState[1];
 
-      var dialogRef = React.useRef(null);
+      var previewState = React.useState({ status: 'idle', yaml: '', json: '', renames: [], identical: [], warnings: [], error: '' });
+      var preview = previewState[0];
+      var setPreview = previewState[1];
 
-      useEscapeKey(props.open, props.onClose);
-
-      /** Load the catalogue once per open. */
-      var load = React.useCallback(function () {
-        setCatalog(function (previous) {
-          return Object.assign({}, previous, { status: 'loading', error: '' });
+      /* Seed the selection once the catalogue arrives: everything ticked, the
+         first provider open so the dialog never looks empty. */
+      var seeded = React.useRef(false);
+      React.useEffect(function () {
+        if (catalog.status !== 'ready' || seeded.current) return undefined;
+        seeded.current = true;
+        var next = {};
+        var open = {};
+        (catalog.providers || []).forEach(function (provider, index) {
+          var models = {};
+          (provider.models || []).forEach(function (model) {
+            models[model.id] = true;
+          });
+          next[provider.id] = models;
+          open[provider.id] = index === 0;
         });
-        postJson('/catalog', {}).then(
-          function (payload) {
-            var providers = Array.isArray(payload.providers) ? payload.providers : [];
-            setCatalog({
-              status: 'ready',
-              providers: providers,
-              skipped: Array.isArray(payload.skipped) ? payload.skipped : [],
-              sources: payload.sources || {},
-              secretsAvailable: payload.secretsAvailable === true,
-              error: '',
-            });
-            /* Default: everything provider ticked, every model ticked. */
-            var next = {};
-            providers.forEach(function (provider) {
-              var models = {};
-              (provider.models || []).forEach(function (model) {
-                models[model.id] = true;
-              });
-              next[provider.id] = models;
-            });
-            setSelected(next);
-          },
-          function (error) {
-            setCatalog({
-              status: 'error',
-              providers: [],
-              skipped: [],
-              sources: {},
-              secretsAvailable: false,
-              error: String(error && error.message ? error.message : error),
-            });
-          },
-        );
-      }, []);
-
-      React.useEffect(function () {
-        if (props.open) {
-          setStatus('');
-          setPreview({ status: 'idle', yaml: '', json: '', renames: [], identical: [], warnings: [], error: '' });
-          load();
-        }
+        setSelected(next);
+        setExpanded(open);
         return undefined;
-      }, [props.open, load]);
+      }, [catalog.status]);
 
       React.useEffect(function () {
-        if (!props.open) return undefined;
-        var timer = setTimeout(function () {
-          if (dialogRef.current !== null && typeof dialogRef.current.focus === 'function') dialogRef.current.focus();
-        }, 0);
-        return function () {
-          clearTimeout(timer);
-        };
-      }, [props.open]);
+        if (catalog.status !== 'ready') seeded.current = false;
+      }, [catalog.status]);
+
+      var providers = catalog.providers || [];
+      var query = search.trim().toLowerCase();
+
+      /** Providers and models matching the search box. */
+      var view = React.useMemo(function () {
+        return providers
+          .map(function (provider) {
+            if (query === '') return { provider: provider, visibleModels: provider.models || [] };
+            var nameHit = String(provider.id).toLowerCase().indexOf(query) >= 0
+              || String(provider.displayName || '').toLowerCase().indexOf(query) >= 0
+              || String(provider.baseURL || '').toLowerCase().indexOf(query) >= 0;
+            var models = (provider.models || []).filter(function (model) {
+              return String(model.id).toLowerCase().indexOf(query) >= 0
+                || String(model.name || '').toLowerCase().indexOf(query) >= 0;
+            });
+            if (nameHit) return { provider: provider, visibleModels: provider.models || [] };
+            if (models.length > 0) return { provider: provider, visibleModels: models };
+            return null;
+          })
+          .filter(Boolean);
+      }, [providers, query]);
 
       var chosenProviders = React.useMemo(function () {
         var list = [];
-        catalog.providers.forEach(function (provider) {
+        providers.forEach(function (provider) {
           var models = selected[provider.id] || {};
           var ids = Object.keys(models).filter(function (id) {
             return models[id] === true;
@@ -575,15 +728,18 @@ window.__ModuleLoader__.load({
           if (ids.length > 0) list.push({ id: provider.id, models: ids });
         });
         return list;
-      }, [catalog.providers, selected]);
+      }, [providers, selected]);
 
-      var selectionKey = React.useMemo(function () {
+      var modelCount = chosenProviders.reduce(function (total, entry) {
+        return total + entry.models.length;
+      }, 0);
+
+      var requestKey = React.useMemo(function () {
         return JSON.stringify(chosenProviders) + '|' + mode + (includeSecrets ? '|s' : '|');
       }, [chosenProviders, mode, includeSecrets]);
 
-      /** Regenerate the preview whenever the request would change. */
       React.useEffect(function () {
-        if (!props.open || catalog.status !== 'ready') return undefined;
+        if (!props.active || catalog.status !== 'ready') return undefined;
         if (chosenProviders.length === 0) {
           setPreview({ status: 'idle', yaml: '', json: '', renames: [], identical: [], warnings: [], error: '' });
           return undefined;
@@ -605,22 +761,14 @@ window.__ModuleLoader__.load({
               });
             },
             function (error) {
-              setPreview({
-                status: 'error',
-                yaml: '',
-                json: '',
-                renames: [],
-                identical: [],
-                warnings: [],
-                error: String(error && error.message ? error.message : error),
-              });
+              setPreview({ status: 'error', yaml: '', json: '', renames: [], identical: [], warnings: [], error: String(error && error.message ? error.message : error) });
             },
           );
         }, 220);
         return function () {
           clearTimeout(timer);
         };
-      }, [props.open, catalog.status, selectionKey]);
+      }, [props.active, catalog.status, requestKey]);
 
       var toggleModel = React.useCallback(function (provider, modelId) {
         setSelected(function (previous) {
@@ -644,93 +792,192 @@ window.__ModuleLoader__.load({
         });
       }, []);
 
-      var modelCount = chosenProviders.reduce(function (total, entry) {
-        return total + entry.models.length;
-      }, 0);
+      var toggleOpen = React.useCallback(function (id) {
+        setExpanded(function (previous) {
+          var next = Object.assign({}, previous);
+          next[id] = previous[id] !== true;
+          return next;
+        });
+      }, []);
+
+      var setAllOpen = React.useCallback(
+        function (open) {
+          setExpanded(function () {
+            var next = {};
+            providers.forEach(function (provider) {
+              next[provider.id] = open;
+            });
+            return next;
+          });
+        },
+        [providers],
+      );
+
+      var selectEverything = React.useCallback(
+        function (on) {
+          setSelected(function (previous) {
+            var next = Object.assign({}, previous);
+            view.forEach(function (entry) {
+              var models = Object.assign({}, next[entry.provider.id] || {});
+              entry.visibleModels.forEach(function (model) {
+                models[model.id] = on;
+              });
+              next[entry.provider.id] = models;
+            });
+            return next;
+          });
+        },
+        [view],
+      );
 
       var onCopy = React.useCallback(function () {
         if (preview.yaml === '') return;
         copyText(preview.yaml).then(function (ok) {
-          setStatus(ok ? copy.copied : copy.copyFailed);
-          setTimeout(function () {
-            setStatus('');
-          }, 2400);
+          props.onStatus(ok ? copy.copied : copy.copyFailed);
         });
-      }, [preview.yaml, copy]);
+      }, [preview.yaml, copy, props.onStatus]);
 
       var onDownload = React.useCallback(function () {
         if (preview.json === '') return;
         var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         var ok = downloadText('dsh-model-config-' + stamp + '.json', preview.json, 'application/json');
-        setStatus(ok ? copy.downloaded : copy.previewFailed);
-        setTimeout(function () {
-          setStatus('');
-        }, 2400);
-      }, [preview.json, copy]);
+        props.onStatus(ok ? copy.downloaded : copy.previewFailed);
+      }, [preview.json, copy, props.onStatus]);
 
-      if (!props.open) return null;
-
-      var body = null;
       if (catalog.status === 'loading') {
-        body = h('div', { className: 'das-col' }, h('div', { className: 'das-note das-note-ok' }, copy.loading));
-      } else if (catalog.status === 'error') {
-        body = h(
+        return h('div', { className: 'das-scroll' }, h('div', { className: 'das-note' }, copy.loading));
+      }
+      if (catalog.status === 'error') {
+        return h(
+          'div',
+          { className: 'das-scroll' },
+          h('div', { className: 'das-note', 'data-tone': 'error' }, copy.loadFailed + catalog.error),
+          h('button', { type: 'button', className: 'das-btn', onClick: props.onReload, style: { marginTop: '10px', alignSelf: 'flex-start' } }, copy.retry),
+        );
+      }
+      if (providers.length === 0) {
+        return h('div', { className: 'das-scroll' }, h('div', { className: 'das-note' }, copy.empty));
+      }
+
+      return h(
+        'div',
+        { className: 'das-body' },
+        /* left: providers */
+        h(
           'div',
           { className: 'das-col' },
-          h('div', { className: 'das-note das-note-error' }, copy.loadFailed + catalog.error),
-          h(
-            'button',
-            { type: 'button', className: 'das-btn', onClick: load, style: { marginTop: '10px' } },
-            copy.retry,
-          ),
-        );
-      } else if (catalog.providers.length === 0) {
-        body = h('div', { className: 'das-col' }, h('div', { className: 'das-note das-note-ok' }, copy.empty));
-      } else {
-        body = h(
-          'div',
-          { className: 'das-body' },
           h(
             'div',
-            { className: 'das-col' },
-            h('h3', { className: 'das-section-title' }, copy.providers),
-            catalog.providers.map(function (provider) {
-              return h(ProviderRow, {
-                key: provider.id,
-                provider: provider,
-                selected: selected[provider.id] || {},
-                onToggleModel: toggleModel,
-                onAllModels: setAllModels,
-                copy: copy,
-              });
+            { className: 'das-col-head' },
+            h('input', {
+              className: 'das-input',
+              type: 'search',
+              value: search,
+              placeholder: copy.search,
+              'aria-label': copy.search,
+              onChange: function (event) {
+                setSearch(event.target.value);
+              },
+              style: { flex: '1 1 auto', minWidth: '0' },
             }),
-            h('h3', { className: 'das-section-title', style: { marginTop: '16px' } }, copy.options),
             h(
-              'label',
-              { className: 'das-option' },
+              'button',
+              { type: 'button', className: 'das-btn das-btn-sm', onClick: function () { setAllOpen(true); } },
+              copy.expandAll,
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'das-btn das-btn-sm', onClick: function () { setAllOpen(false); } },
+              copy.collapseAll,
+            ),
+          ),
+          h(
+            'div',
+            { className: 'das-col-head', style: { borderTop: '0', paddingTop: '8px', paddingBottom: '8px' } },
+            h('h3', { className: 'das-col-title' }, copy.preview),
+            h(
+              'button',
+              { type: 'button', className: 'das-link', onClick: function () { selectEverything(true); } },
+              copy.selectAll,
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'das-link', onClick: function () { selectEverything(false); } },
+              copy.selectNone,
+            ),
+          ),
+          h(
+            'div',
+            { className: 'das-scroll' },
+            view.length === 0
+              ? h('div', { className: 'das-note' }, copy.empty)
+              : view.map(function (entry) {
+                  return h(ProviderGroup, {
+                    key: entry.provider.id,
+                    provider: entry.provider,
+                    visibleModels: entry.visibleModels,
+                    selected: selected,
+                    expanded: expanded[entry.provider.id] === true,
+                    copy: copy,
+                    onToggleModel: toggleModel,
+                    onAllModels: setAllModels,
+                    onToggleOpen: toggleOpen,
+                  });
+                }),
+            Array.isArray(catalog.dormant) && catalog.dormant.length > 0
+              ? h('div', { className: 'das-hint' }, format(copy.moreDormant, { count: catalog.dormant.length }))
+              : null,
+          ),
+        ),
+        /* right: options + preview */
+        h(
+          'div',
+          { className: 'das-col' },
+          h(
+            'div',
+            { className: 'das-col-head' },
+            h('h3', { className: 'das-col-title' }, copy.exportOptions),
+            h(
+              'div',
+              { className: 'das-tabs', role: 'tablist' },
               h(
-                'span',
-                { className: 'das-option-text', style: { flex: 1 } },
-                h('span', null, copy.namingLabel),
-                h(
-                  'select',
-                  {
-                    className: 'das-select',
-                    value: mode,
-                    onChange: function (event) {
-                      setMode(event.target.value);
-                    },
-                  },
-                  h('option', { value: 'auto' }, copy.namingAuto),
-                  h('option', { value: 'always' }, copy.namingAlways),
-                  h('option', { value: 'off' }, copy.namingOff),
-                ),
-                h('span', { className: 'das-option-hint' }, copy.namingHint),
+                'button',
+                { type: 'button', role: 'tab', className: 'das-tab', 'aria-selected': tab === 'yaml' ? 'true' : 'false', onClick: function () { setTab('yaml'); } },
+                copy.yamlTab,
               ),
+              h(
+                'button',
+                { type: 'button', role: 'tab', className: 'das-tab', 'aria-selected': tab === 'json' ? 'true' : 'false', onClick: function () { setTab('json'); } },
+                copy.jsonTab,
+              ),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'das-scroll' },
+            h(
+              'div',
+              { className: 'das-field' },
+              h('label', { className: 'das-label', htmlFor: 'das-naming' }, copy.namingLabel),
+              h(
+                'select',
+                {
+                  id: 'das-naming',
+                  className: 'das-select',
+                  value: mode,
+                  onChange: function (event) {
+                    setMode(event.target.value);
+                  },
+                },
+                h('option', { value: 'auto' }, copy.namingAuto),
+                h('option', { value: 'always' }, copy.namingAlways),
+                h('option', { value: 'off' }, copy.namingOff),
+              ),
+              h('span', { className: 'das-hint' }, copy.namingHint),
             ),
             h(
               'label',
-              { className: 'das-option' },
+              { className: 'das-model', style: { marginBottom: '10px' } },
               h('input', {
                 type: 'checkbox',
                 checked: includeSecrets,
@@ -743,63 +990,15 @@ window.__ModuleLoader__.load({
               }),
               h(
                 'span',
-                { className: 'das-option-text' },
-                h('span', null, copy.secretsLabel),
-                h('span', { className: 'das-option-hint' }, catalog.secretsAvailable ? copy.secretsHint : copy.secretsUnavailable),
-              ),
-            ),
-            catalog.skipped.length > 0
-              ? h(
-                  'div',
-                  { className: 'das-note das-note-ok' },
-                  h('strong', null, copy.skipped + '：'),
-                  h(
-                    'ul',
-                    { className: 'das-list' },
-                    catalog.skipped.map(function (entry) {
-                      return h('li', { key: entry.id }, entry.id + ' — ' + entry.reason);
-                    }),
-                  ),
-                )
-              : null,
-          ),
-          h(
-            'div',
-            { className: 'das-col' },
-            h(
-              'div',
-              { className: 'das-tabs', role: 'tablist' },
-              h(
-                'button',
-                {
-                  type: 'button',
-                  role: 'tab',
-                  className: 'das-tab',
-                  'aria-selected': tab === 'yaml' ? 'true' : 'false',
-                  onClick: function () {
-                    setTab('yaml');
-                  },
-                },
-                copy.yamlTab,
-              ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  role: 'tab',
-                  className: 'das-tab',
-                  'aria-selected': tab === 'json' ? 'true' : 'false',
-                  onClick: function () {
-                    setTab('json');
-                  },
-                },
-                copy.jsonTab,
+                { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
+                h('span', { className: 'das-label', style: { fontSize: '12px' } }, copy.secretsLabel),
+                h('span', { className: 'das-hint' }, catalog.secretsAvailable ? copy.secretsHint : copy.secretsUnavailable),
               ),
             ),
             preview.renames.length > 0
               ? h(
                   'div',
-                  { className: 'das-note das-note-warn' },
+                  { className: 'das-note', 'data-tone': 'warn' },
                   h('strong', null, copy.renames + '：'),
                   h(
                     'ul',
@@ -813,7 +1012,7 @@ window.__ModuleLoader__.load({
             preview.warnings.length > 0
               ? h(
                   'div',
-                  { className: 'das-note das-note-warn' },
+                  { className: 'das-note', 'data-tone': 'warn' },
                   h('strong', null, copy.warnings + '：'),
                   h(
                     'ul',
@@ -824,20 +1023,403 @@ window.__ModuleLoader__.load({
                   ),
                 )
               : null,
-            preview.status === 'error'
-              ? h('div', { className: 'das-note das-note-error' }, copy.previewFailed + preview.error)
-              : null,
+            preview.status === 'error' ? h('div', { className: 'das-note', 'data-tone': 'error' }, copy.previewFailed + preview.error) : null,
             chosenProviders.length === 0
-              ? h('div', { className: 'das-note das-note-ok' }, copy.previewEmpty)
+              ? h('div', { className: 'das-note' }, copy.previewEmpty)
               : preview.status === 'busy' && preview.yaml === ''
-                ? h('div', { className: 'das-note das-note-ok' }, copy.previewBusy)
+                ? h('div', { className: 'das-note' }, copy.previewBusy)
                 : h('pre', { className: 'das-pre', tabIndex: 0, 'aria-label': tab === 'yaml' ? copy.yamlTab : copy.jsonTab }, tab === 'yaml' ? preview.yaml : preview.json),
-            includeSecrets && catalog.secretsAvailable
-              ? h('div', { className: 'das-note das-note-warn' }, copy.secretsIncluded)
-              : null,
+            includeSecrets && catalog.secretsAvailable ? h('div', { className: 'das-note', 'data-tone': 'warn' }, copy.secretsIncluded) : null,
           ),
-        );
+          h(
+            'div',
+            { className: 'das-foot' },
+            h('span', { className: 'das-foot-status' }, format(copy.selected, { providers: chosenProviders.length, models: modelCount })),
+            h(
+              'div',
+              { className: 'das-foot-actions' },
+              h('button', { type: 'button', className: 'das-btn', disabled: preview.yaml === '', onClick: onCopy }, copy.copy),
+              h('button', { type: 'button', className: 'das-btn das-btn-primary', disabled: preview.json === '', onClick: onDownload }, copy.download),
+            ),
+          ),
+        ),
+      );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* import panel                                                       */
+    /* ------------------------------------------------------------------ */
+
+    var ACTION_TONE = {
+      create: 'ok',
+      rename: 'accent',
+      update: 'warn',
+      unchanged: 'neutral',
+      skip: 'neutral',
+      invalid: 'error',
+    };
+
+    /**
+     * The import pane: paste or drop a snippet on the left, review the plan on
+     * the right, then write it.
+     * @param {{ copy: any, catalog: any, active: boolean, onApplied: Function, onStatus: Function }} props
+     */
+    function ImportPanel(props) {
+      var copy = props.copy;
+      var textState = React.useState('');
+      var text = textState[0];
+      var setText = textState[1];
+
+      var policyState = React.useState('merge');
+      var policy = policyState[0];
+      var setPolicy = policyState[1];
+
+      var planState = React.useState({ status: 'idle', entries: [], summary: null, warnings: [], error: '', format: '', validation: null });
+      var plan = planState[0];
+      var setPlan = planState[1];
+
+      var applyState = React.useState({ status: 'idle', message: '' });
+      var applying = applyState[0];
+      var setApplying = applyState[1];
+
+      var draggingState = React.useState(false);
+      var dragging = draggingState[0];
+      var setDragging = draggingState[1];
+
+      var canWrite = props.catalog.canWrite === true;
+
+      /* Preview when the text or the policy settles. */
+      React.useEffect(function () {
+        if (!props.active) return undefined;
+        if (text.trim() === '') {
+          setPlan({ status: 'idle', entries: [], summary: null, warnings: [], error: '', format: '', validation: null });
+          return undefined;
+        }
+        setPlan(function (previous) {
+          return Object.assign({}, previous, { status: 'busy', error: '' });
+        });
+        var timer = setTimeout(function () {
+          postJson('/import/preview', { text: text, policy: policy }).then(
+            function (payload) {
+              setPlan({
+                status: 'ready',
+                entries: Array.isArray(payload.entries) ? payload.entries : [],
+                summary: payload.summary || null,
+                warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+                error: '',
+                format: typeof payload.format === 'string' ? payload.format : '',
+                validation: payload.validation || null,
+              });
+            },
+            function (error) {
+              setPlan({ status: 'error', entries: [], summary: null, warnings: [], error: String(error && error.message ? error.message : error), format: '', validation: null });
+            },
+          );
+        }, 300);
+        return function () {
+          clearTimeout(timer);
+        };
+      }, [props.active, text, policy]);
+
+      /**
+       * @param {File} file
+       */
+      function readFile(file) {
+        if (file === undefined || file === null) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          setText(String(reader.result === null || reader.result === undefined ? '' : reader.result));
+          props.onStatus(file.name);
+        };
+        reader.onerror = function () {
+          props.onStatus(String(reader.error || 'read failed'));
+        };
+        reader.readAsText(file);
       }
+
+      var onDrop = React.useCallback(function (event) {
+        event.preventDefault();
+        setDragging(false);
+        var files = event.dataTransfer !== null && event.dataTransfer !== undefined ? event.dataTransfer.files : null;
+        if (files !== null && files.length > 0) readFile(files[0]);
+      }, []);
+
+      var onPick = React.useCallback(function (event) {
+        var files = event.target.files;
+        if (files !== null && files.length > 0) readFile(files[0]);
+        event.target.value = '';
+      }, []);
+
+      var summary = plan.summary === undefined || plan.summary === null ? null : plan.summary;
+      var changes = summary === null ? 0 : summary.create + summary.rename + summary.update;
+      var validationFailed = plan.validation !== null
+        && plan.validation !== undefined
+        && plan.validation.checked === true
+        && plan.validation.error !== '';
+
+      var onApply = React.useCallback(function () {
+        if (changes === 0 || applying.status === 'busy' || validationFailed) return;
+        setApplying({ status: 'busy', message: '' });
+        postJson('/import/apply', { text: text, policy: policy, confirm: true }).then(
+          function (payload) {
+            setApplying({ status: 'done', message: copy.applied });
+            props.onStatus(copy.applied);
+            if (typeof props.onApplied === 'function') props.onApplied(payload);
+          },
+          function (error) {
+            var message = String(error && error.message ? error.message : error);
+            setApplying({ status: 'error', message: message });
+            props.onStatus(copy.applyFailed + message);
+          },
+        );
+      }, [changes, applying.status, validationFailed, text, policy, copy, props]);
+
+      return h(
+        'div',
+        { className: 'das-body' },
+        /* left: source */
+        h(
+          'div',
+          { className: 'das-col' },
+          h(
+            'div',
+            { className: 'das-col-head' },
+            h('h3', { className: 'das-col-title' }, copy.importTitle),
+            h(
+              'label',
+              { className: 'das-btn das-btn-sm', style: { cursor: 'pointer' } },
+              copy.chooseFile,
+              h('input', { type: 'file', accept: '.yml,.yaml,.json,text/plain,application/json', onChange: onPick, style: { display: 'none' } }),
+            ),
+            text === ''
+              ? null
+              : h(
+                  'button',
+                  { type: 'button', className: 'das-link', onClick: function () { setText(''); setApplying({ status: 'idle', message: '' }); } },
+                  copy.clearText,
+                ),
+          ),
+          h(
+            'div',
+            {
+              className: 'das-scroll',
+              onDragOver: function (event) {
+                event.preventDefault();
+                setDragging(true);
+              },
+              onDragLeave: function () {
+                setDragging(false);
+              },
+              onDrop: onDrop,
+              style: dragging ? { outline: '2px dashed var(--dsw-alias-state-business-primary,#5b8cff)', outlineOffset: '-6px' } : undefined,
+            },
+            h('p', { className: 'das-hint', style: { margin: '0' } }, copy.importHint),
+            h(
+              'div',
+              { className: 'das-field' },
+              h('label', { className: 'das-label', htmlFor: 'das-snippet' }, copy.pasteLabel),
+              h('textarea', {
+                id: 'das-snippet',
+                className: 'das-textarea',
+                value: text,
+                placeholder: copy.pastePlaceholder,
+                spellCheck: false,
+                onChange: function (event) {
+                  setText(event.target.value);
+                  setApplying({ status: 'idle', message: '' });
+                },
+              }),
+              h('span', { className: 'das-hint' }, copy.dropHint),
+            ),
+            h(
+              'div',
+              { className: 'das-field' },
+              h('label', { className: 'das-label', htmlFor: 'das-policy' }, copy.policyLabel),
+              h(
+                'select',
+                {
+                  id: 'das-policy',
+                  className: 'das-select',
+                  value: policy,
+                  onChange: function (event) {
+                    setPolicy(event.target.value);
+                  },
+                },
+                h('option', { value: 'merge' }, copy.policyMerge),
+                h('option', { value: 'skip' }, copy.policySkip),
+                h('option', { value: 'overwrite' }, copy.policyOverwrite),
+              ),
+              h('span', { className: 'das-hint' }, copy.policyHint),
+            ),
+            canWrite ? h('div', { className: 'das-note' }, copy.needConfirm) : h('div', { className: 'das-note', 'data-tone': 'warn' }, copy.cannotWrite),
+          ),
+        ),
+        /* right: plan */
+        h(
+          'div',
+          { className: 'das-col' },
+          h(
+            'div',
+            { className: 'das-col-head' },
+            h('h3', { className: 'das-col-title' }, copy.previewPlan),
+            plan.format !== '' ? h(Badge, { tone: 'neutral' }, plan.format.toUpperCase()) : null,
+          ),
+          h(
+            'div',
+            { className: 'das-scroll' },
+            plan.status === 'busy' ? h('div', { className: 'das-note' }, copy.planBusy) : null,
+            plan.status === 'error' ? h('div', { className: 'das-note', 'data-tone': 'error' }, copy.planFailed + plan.error) : null,
+            plan.status === 'idle' ? h('div', { className: 'das-note' }, copy.planEmpty) : null,
+            summary !== null ? h('div', { className: 'das-hint' }, format(copy.summary, summary)) : null,
+            plan.entries.length > 0
+              ? h(
+                  'div',
+                  { className: 'das-plan' },
+                  plan.entries.map(function (entry, index) {
+                    return h(
+                      'div',
+                      { className: 'das-plan-row', key: entry.provider + ':' + index },
+                      h(Badge, { tone: ACTION_TONE[entry.action] || 'neutral' }, copy['action' + entry.action.charAt(0).toUpperCase() + entry.action.slice(1)] || entry.action),
+                      h(
+                        'div',
+                        { className: 'das-plan-main' },
+                        h(
+                          'span',
+                          { className: 'das-plan-name' },
+                          entry.action === 'rename' ? entry.from + ' → ' + entry.to : entry.to || entry.provider,
+                        ),
+                        h(
+                          'span',
+                          { className: 'das-plan-reason' },
+                          entry.reason + (entry.models && entry.models.total > 0 ? ' · ' + format(copy.modelsAdded, { count: entry.models.total }) : ''),
+                        ),
+                      ),
+                    );
+                  }),
+                )
+              : null,
+            plan.warnings.length > 0
+              ? h(
+                  'div',
+                  { className: 'das-note', 'data-tone': 'warn' },
+                  h('strong', null, copy.warnings + '：'),
+                  h(
+                    'ul',
+                    { className: 'das-list' },
+                    plan.warnings.map(function (warning, index) {
+                      return h('li', { key: index }, warning);
+                    }),
+                  ),
+                )
+              : null,
+            validationFailed ? h('div', { className: 'das-note', 'data-tone': 'error' }, copy.validationFailed + plan.validation.error) : null,
+            applying.status === 'error' ? h('div', { className: 'das-note', 'data-tone': 'error' }, copy.applyFailed + applying.message) : null,
+            applying.status === 'done' ? h('div', { className: 'das-note' }, applying.message) : null,
+          ),
+          h(
+            'div',
+            { className: 'das-foot' },
+            h(
+              'span',
+              { className: 'das-foot-status' },
+              changes === 0 ? copy.applyNoChange : format(copy.summary, summary || {}),
+            ),
+            h(
+              'div',
+              { className: 'das-foot-actions' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'das-btn das-btn-primary',
+                  disabled: !canWrite || changes === 0 || applying.status === 'busy' || validationFailed,
+                  onClick: onApply,
+                },
+                applying.status === 'busy' ? copy.applying : copy.apply,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* dialog                                                             */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * @param {{ open: boolean, onClose: Function, copy: any }} props
+     */
+    function ShareDialog(props) {
+      var copy = props.copy;
+      var tabState = React.useState('export');
+      var tab = tabState[0];
+      var setTab = tabState[1];
+
+      var statusState = React.useState('');
+      var status = statusState[0];
+      var setStatus = statusState[1];
+
+      var catalogState = React.useState({ status: 'loading', providers: [], skipped: [], dormant: [], sources: {}, secretsAvailable: false, canWrite: false, error: '' });
+      var catalog = catalogState[0];
+      var setCatalog = catalogState[1];
+
+      var dialogRef = React.useRef(null);
+
+      var onStatus = React.useCallback(function (message) {
+        setStatus(String(message === undefined || message === null ? '' : message));
+        setTimeout(function () {
+          setStatus('');
+        }, 2600);
+      }, []);
+
+      var load = React.useCallback(function () {
+        setCatalog(function (previous) {
+          return Object.assign({}, previous, { status: 'loading', error: '' });
+        });
+        postJson('/catalog', {}).then(
+          function (payload) {
+            setCatalog({
+              status: 'ready',
+              providers: Array.isArray(payload.providers) ? payload.providers : [],
+              skipped: Array.isArray(payload.skipped) ? payload.skipped : [],
+              dormant: Array.isArray(payload.dormant) ? payload.dormant : [],
+              sources: payload.sources || {},
+              secretsAvailable: payload.secretsAvailable === true,
+              canWrite: payload.canWrite === true,
+              error: '',
+            });
+          },
+          function (error) {
+            setCatalog({
+              status: 'error',
+              providers: [],
+              skipped: [],
+              dormant: [],
+              sources: {},
+              secretsAvailable: false,
+              canWrite: false,
+              error: String(error && error.message ? error.message : error),
+            });
+          },
+        );
+      }, []);
+
+      React.useEffect(function () {
+        if (!props.open) return undefined;
+        setStatus('');
+        if (catalog.status === 'error' || catalog.status === 'loading') load();
+        var timer = setTimeout(function () {
+          if (dialogRef.current !== null && typeof dialogRef.current.focus === 'function') dialogRef.current.focus();
+        }, 0);
+        return function () {
+          clearTimeout(timer);
+        };
+      }, [props.open]);
+
+      useEscapeKey(props.open, props.onClose);
+
+      if (!props.open) return null;
 
       return h(
         'div',
@@ -849,64 +1431,54 @@ window.__ModuleLoader__.load({
         },
         h(
           'div',
-          {
-            className: 'das-dialog',
-            role: 'dialog',
-            'aria-modal': 'true',
-            'aria-label': copy.a11y,
-            ref: dialogRef,
-            tabIndex: -1,
-          },
+          { className: 'das-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': copy.a11y, ref: dialogRef, tabIndex: -1 },
           h(
             'div',
             { className: 'das-head' },
             h(
               'div',
-              null,
+              { className: 'das-head-main' },
               h('h2', null, copy.title),
-              h('p', { className: 'das-sub' }, copy.subtitle),
-            ),
-            h(
-              'button',
-              { type: 'button', className: 'das-btn', onClick: props.onClose },
-              copy.close,
-            ),
-          ),
-          body,
-          h(
-            'div',
-            { className: 'das-foot' },
-            h(
-              'span',
-              { className: 'das-row-hint', role: 'status', 'aria-live': 'polite' },
-              status !== ''
-                ? status
-                : format(copy.selectedCount, { providers: chosenProviders.length, models: modelCount }),
+              h('p', { className: 'das-sub' }, tab === 'export' ? copy.entryHint : copy.importHint),
             ),
             h(
               'div',
-              { className: 'das-foot-actions' },
+              { className: 'das-tabs', role: 'tablist' },
               h(
                 'button',
-                { type: 'button', className: 'das-btn', disabled: preview.yaml === '', onClick: onCopy },
-                copy.copy,
+                { type: 'button', role: 'tab', className: 'das-tab', 'aria-selected': tab === 'export' ? 'true' : 'false', onClick: function () { setTab('export'); } },
+                copy.tabExport,
               ),
               h(
                 'button',
-                { type: 'button', className: 'das-btn das-btn-primary', disabled: preview.json === '', onClick: onDownload },
-                copy.download,
+                { type: 'button', role: 'tab', className: 'das-tab', 'aria-selected': tab === 'import' ? 'true' : 'false', onClick: function () { setTab('import'); } },
+                copy.tabImport,
               ),
             ),
+            h('button', { type: 'button', className: 'das-btn', onClick: props.onClose }, copy.close),
           ),
+          tab === 'export'
+            ? h(ExportPanel, { copy: copy, catalog: catalog, active: props.open && tab === 'export', onReload: load, onStatus: onStatus })
+            : h(ImportPanel, {
+                copy: copy,
+                catalog: catalog,
+                active: props.open && tab === 'import',
+                onStatus: onStatus,
+                onApplied: function () {
+                  /* A write changes the catalogue, so re-read it for the export tab. */
+                  load();
+                },
+              }),
+          status === '' ? null : h('div', { className: 'das-sr', role: 'status', 'aria-live': 'polite' }, status),
         ),
       );
     }
 
     /**
-     * The footer entry itself: one line with a button, plus the dialog.
+     * The footer entry itself: one card with a button, plus the dialog.
      * @param {any} props
      */
-    function ExportFooter(props) {
+    function ShareFooter(props) {
       var copy = useCopy();
       var openState = React.useState(false);
       var open = openState[0];
@@ -923,8 +1495,8 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'das-row-text' },
-            h('span', { className: 'das-row-title' }, copy.button),
-            h('span', { className: 'das-row-hint' }, copy.buttonHint),
+            h('span', { className: 'das-row-title' }, copy.entry),
+            h('span', { className: 'das-row-hint' }, copy.entryHint),
           ),
           h(
             'button',
@@ -935,10 +1507,10 @@ window.__ModuleLoader__.load({
                 setOpen(true);
               },
             },
-            copy.button,
+            copy.entry,
           ),
         ),
-        h(ExportDialog, { open: open, onClose: close, copy: copy }),
+        h(ShareDialog, { open: open, onClose: close, copy: copy }),
       );
     }
 
@@ -1002,11 +1574,7 @@ window.__ModuleLoader__.load({
         render() {
           if (this.state !== null && this.state !== undefined && this.state.error !== null && this.state.error !== undefined) {
             var detail = String(this.state.error.message !== undefined ? this.state.error.message : this.state.error);
-            return h(
-              'div',
-              { className: 'das-root' },
-              h('div', { className: 'das-note das-note-error' }, 'dsh-api-share: ' + detail),
-            );
+            return h('div', { className: 'das-root' }, h('div', { className: 'das-note', 'data-tone': 'error' }, PACKAGE_ID + ': ' + detail));
           }
           return h(Component, this.props);
         }
@@ -1023,12 +1591,7 @@ window.__ModuleLoader__.load({
         installStyles();
         clientContext = ctx === undefined ? null : ctx;
         language = languageOf(currentLocale());
-        register(
-          ctx,
-          SLOT_MODELS_FOOTER,
-          { id: PACKAGE_ID + '.footer', order: 100 },
-          withBoundary('footer', ExportFooter),
-        );
+        register(ctx, SLOT_MODELS_FOOTER, { id: PACKAGE_ID + '.footer', order: 100 }, withBoundary('footer', ShareFooter));
       } catch (error) {
         try {
           console.warn('[' + PACKAGE_ID + '] not activated:', error);

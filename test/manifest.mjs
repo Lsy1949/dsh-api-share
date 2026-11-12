@@ -167,10 +167,40 @@ test('client: registered slot ids are namespaced by the package', () => {
 test('host: routes are namespaced and only registered as exact POST handlers', () => {
   const routes = readFileSync(join(root, 'lib', 'host', 'routes.js'), 'utf8');
   assert.match(routes, new RegExp(`ROUTE_PREFIX = '/${pkg.name}'`));
+  for (const route of ['/catalog', '/export', '/import/preview', '/import/apply']) {
+    assert.ok(routes.includes(`\${ROUTE_PREFIX}${route}\``), `the ${route} route must exist`);
+  }
   const plugin = readFileSync(join(root, 'lib', 'host', 'plugin.js'), 'utf8');
   assert.match(plugin, /ctx\.inject\(\['webServer'\]/);
   assert.match(plugin, /kind: 'exact'/);
   assert.ok(!/ctx\.inject\.\w+\(|static inject/.test(plugin), 'no module-level inject: a missing service must not leave the entry pending');
+});
+
+/**
+ * Strip `//` and block comments so a guard checks code, not prose. Good enough
+ * for this repository: the sources hold no regular-expression literal that could
+ * be mistaken for a comment, and strings are left intact on purpose.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
+test('host: the only write path is configEditor.edit()', () => {
+  const write = stripComments(readFileSync(join(root, 'lib', 'host', 'write.js'), 'utf8'));
+  assert.match(write, /editor\.edit\(row\.entry/);
+  for (const source of shippedSources()) {
+    const text = readFileSync(join(root, source), 'utf8');
+    const code = stripComments(text);
+    /* A third-party plugin must never hand-write the profile patch: it has no
+       lock, no schema validation and no YAML parser for that document. */
+    assert.ok(!/writeFile|appendFile|createWriteStream/.test(code), `${source} must not write files`);
+    assert.ok(!/node:fs/.test(code), `${source} must not import the filesystem`);
+    if (source !== 'lib/host/write.js') {
+      assert.ok(!/\beditor\.edit\(|\bconfigEditor\.edit\(/.test(code), `${source} must not edit configuration directly`);
+    }
+  }
 });
 
 test('yaml: emitted text uses two-space indentation and no tabs', () => {

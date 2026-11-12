@@ -2,13 +2,16 @@
 
 中文 | [English](README.md)
 
-把 [DeepSeek Harness](https://github.com/deepseek-ai) 某个 profile 的模型 provider 配置分享出去。
+把 [DeepSeek Harness](https://github.com/deepseek-ai) 某个 profile 的模型 provider 配置分享出去 —— 也能收回来。
 
-在 **设置 → 模型** 页面底部加一个「导出配置」入口：勾选要导出的 API（provider）和它们下面的模型，右侧实时
-生成可直接粘贴到目标 `cordis.patch.yml` 的 YAML 片段与一份 JSON 文档；与目标环境重名时 id 会自动加后缀，
-每一次改名都列在预览里。
+在 **设置 → 模型** 页面底部加一个「导入 / 导出配置」入口，打开后是两个标签页：
 
-- **宿主半边**：两条同源 `POST` 路由，读本 profile 的配置、合成两个产物。不写盘、不改 profile。
+- **导出**：勾选要导出的 API（provider）与它下面的模型（每个 API 可折叠收起），右侧实时生成可直接粘贴到目标
+  `cordis.patch.yml` 的 YAML 片段与一份 JSON 文档；与目标重名时 id 自动加后缀，每次改名都列在预览里。
+- **导入**：粘贴（或把文件拖进来）一段之前导出的 YAML/JSON，先看「会新建什么、会改名什么、会跳过什么」的
+  计划，再一键写进本 profile。
+
+- **宿主半边**：四条同源 `POST` 路由，读配置、合成产物、写配置。写只有一个入口 —— `configEditor.edit()`。
 - **客户端半边**：一个 footer 插槽条目、一个对话框。零第三方依赖、无打包器、无 JSX。
 
 ## 兼容性
@@ -75,6 +78,38 @@
 「目标」是**本机当前生效的配置**——插件看不到另一台机器，所以冲突判断基于本地事实。每次改名都会出现在 YAML
 注释和预览面板里。改名的 provider 是一条新路由，所以它下面的模型 id 保持原样。
 
+## 导入
+
+把之前导出的片段（YAML 或 JSON 都行）粘进「导入」标签页，或直接把 `.yml` / `.yaml` / `.json` 文件拖进输入区。
+
+冲突处理三档：
+
+| 档位 | 行为 |
+| --- | --- |
+| 保留现有，冲突项改名（默认） | 同名的 provider 不动，导入的那份拿到 `foo-2`、`foo-3`… |
+| 保留现有，冲突项跳过 | 同名的 provider 直接跳过，只导入新的 |
+| 冲突项用导入内容覆盖 | 同名的 provider 整段替换成片段里的内容 |
+
+流程是「先预览、后写入」：粘贴后自动生成计划，逐条标出 `新增 / 改名新增 / 覆盖 / 已存在 / 跳过 / 无效`，
+并给出模型条数与原因；有改动才能点「写入配置」。
+
+写入是怎么发生的（这是本插件唯一会改本机状态的地方）：
+
+- 走 `configEditor.edit(entry, change)` —— 它取 profile 的文件锁、按 `llm-pi-ai` 自己的 schema 校验候选配置、
+  原子写入、再让 Loader 重新挂载；重载失败会回滚文件。插件自己**从不**手写 `cordis.patch.yml`。
+- 只替换 `llm-pi-ai` 那一行的 `providers` 字典：行里的 `retryPolicy`、`headers` 等其它字段原样保留，配置里
+  其它行一个字都不动。
+- **全有或全无**：任一条 provider 不合法（例如手写路由缺 `api` / `baseURL`），整个导入被拒绝，profile 不变。预览阶段就会用适配器自己的 schema 跑一遍校验，把 `$.providers.x.api expected …` 这样的原话直接显示出来，并禁用「写入配置」。
+- 片段里 llm-pi-ai 不认识的字段会被丢掉并在预览里说明；`!!js` 表达式在任意深度都会被剥离——`configEditor.edit()`
+  会把它还原成会被 Loader **执行**的 YAML 节点，所以这是安全边界，不只是洁癖。
+- 写入后还会回头核对：新路由必须出现在 `llm.listProviders()` 里。pi-ai 遇到路由重名只写日志不报错，这一步把
+  「写进去了但其实没生效」变成一条明确提示。
+- 没有 `configEditor`（比如非 profile 的运行方式）时，`catalog` 会返回 `canWrite: false`，界面上「写入配置」
+  直接禁用，只剩只读预览。
+
+写入成功后 pi-ai 会被 Loader 重新挂载，因此新 provider 立刻可见；正在编辑的模型设置卡片可能还拿着旧快照，
+关掉重开即可。
+
 ## 明文密钥
 
 默认关闭。勾选「包含明文 API Key」后：
@@ -98,16 +133,19 @@ dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
 
 ## 路由
 
-都是同源 `POST`、只答 JSON、不写盘。
+都是同源 `POST`、只答 JSON；只有 `/import/apply` 会写配置（且必须带 `confirm: true`）。
 
 | 路由 | 请求体 | 返回 |
 | --- | --- | --- |
-| `POST /dsh-api-share/catalog` | `{}` | `{ ok, sources, secretsAvailable, providers[], skipped[], dormant[], warnings[] }` |
+| `POST /dsh-api-share/catalog` | `{}` | `{ ok, sources, secretsAvailable, canWrite, providers[], skipped[], dormant[], warnings[] }` |
 | `POST /dsh-api-share/export` | `{ selection: [{ id, models[] }], mode: "auto"\|"always"\|"off", includeSecrets }` | `{ ok, mode, yaml, json, renames[], identical[], warnings[], providerIds[], secretsIncluded }` |
+| `POST /dsh-api-share/import/preview` | `{ text, policy: "merge"\|"skip"\|"overwrite" }` | `{ ok, format, policy, entries[], summary, warnings[], canWrite, changes }` |
+| `POST /dsh-api-share/import/apply` | `{ text, policy, confirm: true }` | `{ ok, applied, namespace, entries[], summary, warnings[] }` |
 
 `sources.tier` 说明数据来自哪一层：`settings`（最全）→ `configEditor` → `loader` → `none`。
-错误码：`400 bad-body`、`403 cross-origin`、`403 secrets-require-browser-origin`、`405 method-not-allowed`、
-`500 internal`（带 `detail`）。
+错误码：`400 bad-body` / `400 not-confirmed`、`403 cross-origin`、`403 secrets-require-browser-origin`、
+`405 method-not-allowed`、`409 write-unavailable`、`422 bad-snippet`、`422 refused` / `stale-entry` /
+`overridden` / `write-failed`、`500 internal`（都带 `detail`）。
 
 ## 已知边界
 
@@ -115,22 +153,27 @@ dsh plugin --profile desktop add link:D:\path\to\dsh-api-share
   的 provider 也不在其中。
 - **目标环境不可见。** 冲突判断只能用本机事实，导出是一份「提案」，不是一次同步。
 - **内置目录提供的模型容量不导出。** 想把目录容量钉死，请在配置里显式写 `models`。
-- **删掉 provider 行不会清理它的凭据**——本插件从不写 profile。
+- **导入只增改、不删除。** 片段里没有的 provider 不会被移除；要删请在模型设置里操作。
+- **「覆盖」是整段替换**：该 provider 在片段里写了什么就是什么，原有但片段没写的字段（例如 `headers`）会消失。
+  想保守一点就用默认的「改名新增」。
+- **删掉 provider 行不会清理它的凭据**——本插件不碰凭据。
 
 ## 开发
 
 ```powershell
 npm run check   # 对每个发布文件跑 node --check
-npm test        # 5 个套件，56 条断言
+npm test        # 7 个套件，98 条断言
 ```
 
 | 套件 | 覆盖 |
 | --- | --- |
 | `test/unit.mjs` | YAML 生成（引号、缩进、序列形态）与改名策略 |
 | `test/export.mjs` | 选择 → YAML/JSON 合成、改名、密钥、拒绝路径 |
-| `test/catalog.mjs` | 三级读取、`!!js` 跳过、目标事实、请求校验、凭据门禁 |
-| `test/client.mjs` | 浏览器包在假 module loader 里激活、注册、渲染 |
-| `test/manifest.mjs` | 发布与兼容性守卫（清单、导出、engines、导入、插槽、路由） |
+| `test/import.mjs` | YAML 子集解析（含拒绝路径）、片段识别、导入计划三档策略 |
+| `test/catalog.mjs` | 三级读取、命名空间隔离、`!!js` 跳过、目标事实、请求校验、凭据门禁 |
+| `test/write.mjs` | 定位 pi-ai 行、`configEditor.edit()` 的合并语义与各类失败映射 |
+| `test/client.mjs` | 用迷你渲染器（`test/harness.mjs`）挂载真实组件：打开对话框、折叠分组、搜索、导出预览、导入计划、校验失败禁用写入 |
+| `test/manifest.mjs` | 发布与兼容性守卫（清单、导出、engines、导入、插槽、路由、唯一写入路径） |
 
 ## 发布清单
 

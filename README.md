@@ -2,15 +2,18 @@
 
 [中文](README.zh.md) | English
 
-Share the model provider configuration of a [DeepSeek Harness](https://github.com/deepseek-ai) profile.
+Share the model provider configuration of a [DeepSeek Harness](https://github.com/deepseek-ai) profile — and take it back.
 
-Adds an **Export configuration** entry at the bottom of **Settings → Models**: tick the APIs (providers) you want
-and the models under each one, watch a paste-ready `cordis.patch.yml` snippet and a JSON document appear live, and
-let ids that would collide with the receiving side get a numeric suffix automatically — every rename is listed in
-the preview.
+Adds an **Import / export configuration** entry at the bottom of **Settings → Models**, opening a dialog with two tabs:
 
-- **Host half**: two same-origin `POST` routes that read the profile's own configuration and compose the two
-  artefacts. It writes nothing, touches no file, and never edits the profile.
+- **Export**: tick the APIs (providers) and the models under each one — every API group collapses — and watch a
+  paste-ready `cordis.patch.yml` snippet and a JSON document appear live. Ids that would collide with the
+  receiving side get a numeric suffix, and every rename is listed in the preview.
+- **Import**: paste a previously exported YAML/JSON snippet (or drop the file in), review the plan — *new,
+  renamed, replaced, already there, skipped, invalid* — then write it into this profile in one click.
+
+- **Host half**: four same-origin `POST` routes: read, compose, plan, write. There is exactly one write path —
+  `configEditor.edit()`.
 - **Client half**: one footer slot entry, one dialog. No third-party dependency, no bundler, no JSX.
 
 ## Compatibility
@@ -80,6 +83,38 @@ left out:
 judged on local facts. Every rename appears in the YAML header comments and in the preview. A renamed provider is
 a brand-new route, so its model ids keep their spelling.
 
+## Import
+
+Paste a snippet exported earlier (YAML or JSON — both work) into the **Import** tab, or drop a `.yml` / `.yaml` /
+`.json` file onto the input.
+
+| Collision policy | Behaviour |
+| --- | --- |
+| Keep existing, rename the import (default) | the provider already in the profile is untouched; the imported one becomes `foo-2`, `foo-3`… |
+| Keep existing, skip the import | a colliding provider is skipped; only new ones are created |
+| Overwrite with the import | a colliding provider is replaced wholesale by the snippet |
+
+The flow is *preview first, then write*: the plan appears as you paste and labels every provider
+`new / new (renamed) / replace / already there / skipped / invalid`, with its model count and the reason. The
+write button stays disabled until there is something to change.
+
+How the write happens — the only place this plugin changes local state:
+
+- Through `configEditor.edit(entry, change)`: it takes the profile's file lock, validates the candidate through
+  `llm-pi-ai`'s own schema, writes atomically, then lets the Loader re-mount; a failed reload rolls the file back.
+  The plugin never edits `cordis.patch.yml` itself — it has no lock, no schema and no YAML parser for it.
+- Only the `providers` dictionary of the `llm-pi-ai` row is replaced: its `retryPolicy`, `headers` and any other
+  field survive, and no other row in the file is touched.
+- **All or nothing**: one invalid provider (a hand-declared route without `api` / `baseURL`, for example) rejects
+  the whole import and leaves the profile unchanged.
+- Fields the adapter does not accept are dropped and reported; `!!js` expressions are stripped at any depth — `configEditor.edit()` turns such a node back into YAML the Loader *evaluates*, so this is a security boundary, not tidiness.
+- After writing, the new routes are checked against `llm.listProviders()`: pi-ai only logs a route collision, so this turns "written but not serving" into an explicit note.
+- Without `configEditor` (a non-profile composition), `catalog` reports `canWrite: false` and the UI disables the
+  write button, leaving the read-only preview.
+
+After a successful write the pi-ai adapter is re-mounted, so the new provider is served immediately; a Models
+card that is already open may still hold the old snapshot — close and reopen it.
+
 ## Plaintext keys
 
 Off by default. When you tick **Include plaintext API keys**:
@@ -103,16 +138,19 @@ Remove with `dsh plugin --profile desktop remove dsh-api-share`.
 
 ## Routes
 
-Both are same-origin `POST`, answer JSON, and write nothing.
+Both are same-origin `POST`, answer JSON; only `/import/apply` writes, and it requires `confirm: true`.
 
 | Route | Body | Answer |
 | --- | --- | --- |
-| `POST /dsh-api-share/catalog` | `{}` | `{ ok, sources, secretsAvailable, providers[], skipped[], dormant[], warnings[] }` |
+| `POST /dsh-api-share/catalog` | `{}` | `{ ok, sources, secretsAvailable, canWrite, providers[], skipped[], dormant[], warnings[] }` |
 | `POST /dsh-api-share/export` | `{ selection: [{ id, models[] }], mode: "auto"\|"always"\|"off", includeSecrets }` | `{ ok, mode, yaml, json, renames[], identical[], warnings[], providerIds[], secretsIncluded }` |
+| `POST /dsh-api-share/import/preview` | `{ text, policy: "merge"\|"skip"\|"overwrite" }` | `{ ok, format, policy, entries[], summary, warnings[], canWrite, changes }` |
+| `POST /dsh-api-share/import/apply` | `{ text, policy, confirm: true }` | `{ ok, applied, namespace, entries[], summary, warnings[] }` |
 
 `sources.tier` names the layer that answered the read: `settings` (richest) → `configEditor` → `loader` → `none`.
-Errors: `400 bad-body`, `403 cross-origin`, `403 secrets-require-browser-origin`, `405 method-not-allowed`,
-`500 internal` (with `detail`).
+Errors: `400 bad-body` / `400 not-confirmed`, `403 cross-origin`, `403 secrets-require-browser-origin`,
+`405 method-not-allowed`, `409 write-unavailable`, `422 bad-snippet`, `422 refused` / `stale-entry` /
+`overridden` / `write-failed`, `500 internal` (all with `detail`).
 
 ## Known edges
 
@@ -120,22 +158,28 @@ Errors: `400 bad-body`, `403 cross-origin`, `403 secrets-require-browser-origin`
   as do providers another plugin injects at runtime.
 - **The target is invisible.** Conflicts are judged on local facts; the export is a proposal, not a sync.
 - **Catalog capacities are not exported.** Pin them by writing `models` explicitly in the configuration.
-- **Deleting a provider row does not clean up its credential** — this plugin never writes the profile.
+- **Import only creates and updates.** A provider the snippet does not mention is never removed; use Models
+  settings for that.
+- **Overwrite replaces the whole provider**: what the snippet omits (its `headers`, say) is gone. The default
+  *rename* policy is the conservative choice.
+- **Deleting a provider row does not clean up its credential** — this plugin never touches credentials.
 
 ## Development
 
 ```powershell
 npm run check   # node --check on every shipped file
-npm test        # 56 assertions across 5 suites
+npm test        # 98 assertions across 7 suites
 ```
 
 | Suite | Covers |
 | --- | --- |
 | `test/unit.mjs` | YAML emitter (quoting, indentation, sequence shapes) and the naming policy |
 | `test/export.mjs` | selection → YAML/JSON composition, renames, secrets, refusals |
-| `test/catalog.mjs` | the read tiers, `!!js` skipping, target facts, request validation, credential gating |
-| `test/client.mjs` | the browser bundle activating, registering and rendering inside a fake module loader |
-| `test/manifest.mjs` | publication and compatibility guards (manifest, exports, engines, imports, slots, routes) |
+| `test/import.mjs` | the YAML reader (including its refusals), snippet intake, the three import policies |
+| `test/catalog.mjs` | the read tiers, namespace isolation, `!!js` skipping, target facts, request validation, credential gating |
+| `test/write.mjs` | locating the pi-ai row, the merge semantics of `configEditor.edit()`, every failure mapping |
+| `test/client.mjs` | the real components mounted through a miniature renderer (`test/harness.mjs`): dialog, collapsing groups, search, export preview, import plan, validation-disabled write |
+| `test/manifest.mjs` | publication and compatibility guards (manifest, exports, engines, imports, slots, routes, the single write path) |
 
 ## Publishing checklist
 
