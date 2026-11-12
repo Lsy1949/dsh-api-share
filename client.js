@@ -53,6 +53,7 @@ window.__ModuleLoader__.load({
         loadFailed: '读取配置失败：',
         retry: '重试',
         empty: '这个 profile 里还没有可导出的 provider。请先在模型设置里添加 API。',
+        providersLabel: 'API / 模型',
         search: '搜索 provider 或模型…',
         expandAll: '展开全部',
         collapseAll: '收起全部',
@@ -142,6 +143,7 @@ window.__ModuleLoader__.load({
         loadFailed: 'Could not read the configuration: ',
         retry: 'Retry',
         empty: 'No exportable provider in this profile yet. Add an API in Models settings first.',
+        providersLabel: 'APIs / models',
         search: 'Search providers or models…',
         expandAll: 'Expand all',
         collapseAll: 'Collapse all',
@@ -322,8 +324,8 @@ window.__ModuleLoader__.load({
           '.das-link:hover{text-decoration:underline}',
           /* dialog shell */
           '.das-backdrop{position:fixed;inset:0;background:var(--dsw-alias-bg-mask-1,rgba(0,0,0,.48));display:flex;align-items:center;justify-content:center;padding:24px;z-index:1000}',
-          '.das-dialog{width:min(1040px,100%);max-height:min(88vh,920px);display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-2,#1c1c20);color:var(--dsw-alias-label-primary,#eee);border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.32));border-radius:var(--dsw-radius-lg,16px);box-shadow:var(--dsw-elevation-prominent,0 24px 64px rgba(0,0,0,.45));overflow:hidden}',
-          '.das-head{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
+          '.das-dialog{width:min(1040px,100%);height:min(88vh,920px);max-height:min(88vh,920px);display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-2,#1c1c20);color:var(--dsw-alias-label-primary,#eee);border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.32));border-radius:var(--dsw-radius-lg,16px);box-shadow:var(--dsw-elevation-prominent,0 24px 64px rgba(0,0,0,.45));overflow:hidden}',
+          '.das-head{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-head-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}',
           '.das-head h2{margin:0;font-size:16px;font-weight:650;line-height:1.25}',
           '.das-sub{margin:0;font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95))}',
@@ -332,12 +334,12 @@ window.__ModuleLoader__.load({
           '.das-tab[aria-selected="true"]{background:var(--dsw-alias-bg-layer-1,#18181b);color:var(--dsw-alias-label-primary,inherit);box-shadow:0 0 0 1px var(--dsw-alias-border-l3,rgba(128,128,128,.3))}',
           '.das-tab:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,#4c8dff);outline-offset:2px}',
           /* body */
-          '.das-body{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(360px,1fr);grid-template-rows:minmax(0,1fr);min-height:0;flex:1;overflow:hidden}',
+          '.das-body{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(360px,1fr);grid-template-rows:minmax(0,1fr) auto;min-height:0;flex:1 1 auto;overflow:hidden}',
           '.das-col{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}',
           '.das-col+.das-col{border-left:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-col-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.16));background:var(--dsw-alias-bg-layer-2,#1c1c20);position:sticky;top:0;z-index:2}',
           '.das-col-title{font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));margin:0;flex:1}',
-          '.das-scroll{overflow-y:auto;overflow-x:hidden;padding:12px 16px;min-height:0;flex:1 1 0;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}',
+          '.das-scroll{overflow-y:auto;overflow-x:hidden;padding:12px 16px;min-height:0;flex:1 1 0;max-height:calc(88vh - 240px);display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain;scrollbar-gutter:stable}',
           /* provider accordion */
           '.das-dormant{margin-top:4px;padding-top:8px;border-top:1px dashed var(--dsw-alias-border-l3,rgba(128,128,128,.24))}',
           '.das-group{border:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.26));border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-settings-card-fill,rgba(127,127,127,.05));overflow:hidden}',
@@ -375,7 +377,7 @@ window.__ModuleLoader__.load({
           '.das-plan-name{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
           '.das-plan-reason{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));line-height:1.5}',
           /* footer */
-          '.das-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24));flex-wrap:wrap}',
+          '.das-foot{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24));flex-wrap:wrap}',
           '.das-foot-status{font-size:12px;color:var(--dsw-alias-label-secondary,rgba(140,140,150,.95));min-width:0;flex:1}',
           '.das-foot-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}',
           '@media (max-width:820px){.das-body{grid-template-columns:1fr}.das-col+.das-col{border-left:0;border-top:1px solid var(--dsw-alias-border-l3,rgba(128,128,128,.24))}}',
@@ -919,7 +921,7 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'das-col-head', style: { borderTop: '0', paddingTop: '8px', paddingBottom: '8px' } },
-            h('h3', { className: 'das-col-title' }, copy.preview),
+            h('h3', { className: 'das-col-title' }, copy.providersLabel),
             h(
               'button',
               { type: 'button', className: 'das-link', onClick: function () { selectEverything(true); } },
@@ -1090,9 +1092,10 @@ window.__ModuleLoader__.load({
                 : h('pre', { className: 'das-pre', tabIndex: 0, 'aria-label': tab === 'yaml' ? copy.yamlTab : copy.jsonTab }, tab === 'yaml' ? preview.yaml : preview.json),
             includeSecrets && catalog.secretsAvailable ? h('div', { className: 'das-note', 'data-tone': 'warn' }, copy.secretsIncluded) : null,
           ),
-          h(
-            'div',
-            { className: 'das-foot' },
+        ),
+        h(
+          'div',
+          { className: 'das-foot' },
             h('span', { className: 'das-foot-status' }, format(copy.selected, { providers: chosenProviders.length, models: modelCount })),
             h(
               'div',
@@ -1109,7 +1112,6 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
-        ),
       );
     }
 
@@ -1383,9 +1385,10 @@ window.__ModuleLoader__.load({
             applying.status === 'error' ? h('div', { className: 'das-note', 'data-tone': 'error' }, copy.applyFailed + applying.message) : null,
             applying.status === 'done' ? h('div', { className: 'das-note' }, applying.message) : null,
           ),
-          h(
-            'div',
-            { className: 'das-foot' },
+        ),
+        h(
+          'div',
+          { className: 'das-foot' },
             h(
               'span',
               { className: 'das-foot-status' },
@@ -1406,7 +1409,6 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
-        ),
       );
     }
 

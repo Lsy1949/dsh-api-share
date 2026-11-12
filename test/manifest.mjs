@@ -213,12 +213,16 @@ test('yaml: emitted text uses two-space indentation and no tabs', () => {
 test('client: the dialog columns are bounded so each column scrolls on its own', () => {
   const text = readFileSync(join(root, 'client.js'), 'utf8');
   /* A grid row sized by content makes a `flex:1; overflow:auto` child grow past
-     the dialog, and the dialog's own `overflow:hidden` then clips the list — the
-     list must scroll, so the row has to be explicitly bounded. */
-  assert.match(text, /\.das-body\{[^}]*grid-template-rows:minmax\(0,1fr\)/);
+     the dialog, and the dialog's own `overflow:hidden` then clips the list. The
+     row must be explicitly bounded — and the dialog needs a *definite* height for
+     that row to have anything to divide, otherwise the body collapses. */
+  assert.match(text, /\.das-dialog\{[^}]*height:min\(88vh,920px\)/, 'the dialog needs a definite height');
+  assert.match(text, /\.das-body\{[^}]*grid-template-rows:minmax\(0,1fr\) auto/);
   assert.match(text, /\.das-body\{[^}]*min-height:0/);
   assert.match(text, /\.das-col\{[^}]*min-height:0[^}]*overflow:hidden/);
   assert.match(text, /\.das-scroll\{[^}]*overflow-y:auto[^}]*min-height:0[^}]*flex:1 1 0/);
+  /* The action bar spans the dialog, not just one column. */
+  assert.match(text, /\.das-foot\{[^}]*grid-column:1\/-1/);
 });
 
 test('client: every API group starts collapsed', () => {

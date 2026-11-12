@@ -7,9 +7,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- The dialog collapsed to a sliver: the body was `flex: 1` inside a dialog that only declared `max-height`, so the
+  grid had no definite height to divide and both columns were squashed. The dialog now declares a definite
+  `height: min(88vh, 920px)`, the body's rows are `minmax(0, 1fr) auto`, and the scroll areas carry a
+  `calc(88vh - 240px)` safety net.
 - The provider column could not scroll: the dialog's grid row was content-sized, so a `flex: 1; overflow: auto`
-  list grew past the dialog and was clipped by it. The row is now bounded (`grid-template-rows: minmax(0, 1fr)`),
-  each column owns its scroll area, and a layout guard in `test/manifest.mjs` keeps it that way.
+  list grew past the dialog and was clipped by it. Each column now owns its scroll area, and layout guards in
+  `test/manifest.mjs` keep it that way.
+- The action bar only spanned the right column; it is now a grid row across the whole dialog
+  (`grid-column: 1 / -1`).
+- The left column's heading said "预览"; it now names what it holds ("API / 模型").
 
 ### Changed
 
